@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Entorno y editores
+.env
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+CLAUDE.md
+
+# Datos pesados (respaldar aparte; ver riesgo de dataset en el plan)
+datos/referencia/*
+!datos/referencia/.gitkeep
+motor-identificacion/modelo/*
+!motor-identificacion/modelo/.gitkeep
+
+# Nunca subir archivos de usuarios (RNF-09)
+subidas/
+tmp/

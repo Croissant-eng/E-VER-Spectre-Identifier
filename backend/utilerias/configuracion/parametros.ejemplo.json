@@ -1,0 +1,19 @@
+{
+  "_descripcion": "UT-03 · Única fuente operativa de parámetros. La regla vive en Requerimientos V3 §6.1; el valor vive aquí.",
+  "archivo": {
+    "tamano_maximo_bytes": 5242880,
+    "formatos_permitidos": [".jdx", ".csv"]
+  },
+  "validacion": {
+    "puntos_minimos": 300,
+    "rango_requerido_cm1": [1400, 3700],
+    "jcamp_etiquetas_obligatorias": ["##TITLE=", "##JCAMP-DX=", "##XUNITS=", "##YUNITS=", "##END="],
+    "jcamp_etiquetas_datos_una_de": ["##XYDATA=", "##PEAK TABLE="]
+  },
+  "motor": {
+    "_nota": "Se usan a partir del incremento 3 (MOD-06).",
+    "umbral_confianza": 0.6,
+    "peso_reglas": 0.5,
+    "peso_ml": 0.5
+  }
+}
