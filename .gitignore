@@ -13,7 +13,6 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
-CLAUDE.md
 
 # Datos pesados (respaldar aparte; ver riesgo de dataset en el plan)
 datos/referencia/*
