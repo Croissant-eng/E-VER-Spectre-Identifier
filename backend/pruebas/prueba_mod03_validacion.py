@@ -10,6 +10,10 @@ como texto, simulado o leído de los fixtures de `datos/pruebas/`. Tal como lo
 entrega MOD-02, el texto ya viene sin BOM y con los bytes inválidos convertidos
 en el carácter de reemplazo «�» (U+FFFD).
 
+Todas las pruebas llaman a `validar_formato`, que es T-04 sola. El camino
+completo de MOD-03 —formato y después requisitos— es `validar`, y se prueba en
+`prueba_mod03_requisitos.py`.
+
 **Lo que todavía no se prueba aquí** es de T-05: contar puntos y mirar el rango.
 Por eso dos fixtures que T-05 va a rechazar —el de un punto menos y el de rango
 corto— aquí salen **válidos**: su formato es de verdad el que dicen. Hay pruebas
@@ -38,7 +42,7 @@ from backend.validacion import (
     Veredicto,
     extension_de,
     separador_de,
-    validar,
+    validar_formato,
 )
 from herramientas.generador_espectros import csv_sintetico, jdx_sintetico
 
@@ -97,7 +101,7 @@ def _con_etiquetas(*etiquetas: str) -> Configuracion:
 def prueba_ca_01_3_rechaza_el_png_con_el_mensaje_de_formato(
     carpeta_fixtures: Path,
 ) -> None:
-    veredicto = validar("imagen.png", _texto(carpeta_fixtures / "imagen.png"))
+    veredicto = validar_formato("imagen.png", _texto(carpeta_fixtures / "imagen.png"))
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.FORMATO_NO_SOPORTADO
@@ -110,7 +114,7 @@ def prueba_ca_01_3_rechaza_el_png_con_el_mensaje_de_formato(
 def prueba_ca_01_3_el_mensaje_nombra_los_formatos_de_ut03(
     carpeta_fixtures: Path,
 ) -> None:
-    veredicto = validar("imagen.png", _texto(carpeta_fixtures / "imagen.png"))
+    veredicto = validar_formato("imagen.png", _texto(carpeta_fixtures / "imagen.png"))
     mensaje = mensajes.obtener(veredicto.codigo)
 
     for formato in obtener_configuracion().archivo.formatos_permitidos:
@@ -124,20 +128,20 @@ def prueba_ca_01_3_el_mensaje_nombra_los_formatos_de_ut03(
 )
 def prueba_ca_01_3_solo_pasan_las_extensiones_de_ut03(nombre: str) -> None:
     """`.dx` queda fuera a propósito (D-0), igual que cualquier otra."""
-    veredicto = validar(nombre, CSV_VALIDO)
+    veredicto = validar_formato(nombre, CSV_VALIDO)
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.FORMATO_NO_SOPORTADO
 
 
 def prueba_la_extension_no_distingue_mayusculas() -> None:
-    assert validar("ESPECTRO.CSV", CSV_VALIDO).valido
-    assert validar("Espectro.Jdx", JDX_VALIDO).valido
+    assert validar_formato("ESPECTRO.CSV", CSV_VALIDO).valido
+    assert validar_formato("Espectro.Jdx", JDX_VALIDO).valido
 
 
 def prueba_el_archivo_sin_nombre_se_rechaza_por_formato() -> None:
     """Así llega de MOD-02 una subida sin nombre."""
-    veredicto = validar("(sin nombre)", CSV_VALIDO)
+    veredicto = validar_formato("(sin nombre)", CSV_VALIDO)
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.FORMATO_NO_SOPORTADO
@@ -153,7 +157,7 @@ def prueba_ca_02_5_rechaza_el_binario_disfrazado_por_su_contenido(
 ) -> None:
     contenido = _texto(carpeta_fixtures / "binario-disfrazado.csv")
 
-    veredicto = validar("ejecutable.csv", contenido)
+    veredicto = validar_formato("ejecutable.csv", contenido)
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.ARCHIVO_NO_ES_TEXTO
@@ -173,7 +177,7 @@ def prueba_ca_02_5_rechaza_el_binario_disfrazado_por_su_contenido(
 )
 def prueba_ca_02_5_lo_que_no_es_texto_se_rechaza(caso: str, contenido: str) -> None:
     """Defensa de RNF-03: nunca se interpreta algo que no sea texto."""
-    veredicto = validar("espectro.csv", contenido)
+    veredicto = validar_formato("espectro.csv", contenido)
 
     assert not veredicto.valido, caso
     assert veredicto.codigo == mensajes.ARCHIVO_NO_ES_TEXTO, caso
@@ -181,7 +185,7 @@ def prueba_ca_02_5_lo_que_no_es_texto_se_rechaza(caso: str, contenido: str) -> N
 
 def prueba_los_espacios_normales_del_texto_si_se_aceptan() -> None:
     """Tabulador, salto de línea y retorno de carro son texto corriente."""
-    veredicto = validar("espectro.csv", "400.0,0.80\r\n500.0,0.75\r\n")
+    veredicto = validar_formato("espectro.csv", "400.0,0.80\r\n500.0,0.75\r\n")
 
     assert veredicto.valido
 
@@ -192,7 +196,7 @@ def prueba_los_espacios_normales_del_texto_si_se_aceptan() -> None:
 
 
 def prueba_ca_02_4_el_archivo_vacio_da_su_motivo(carpeta_fixtures: Path) -> None:
-    veredicto = validar(
+    veredicto = validar_formato(
         "archivo-vacio.csv", _texto(carpeta_fixtures / "archivo-vacio.csv")
     )
 
@@ -203,7 +207,7 @@ def prueba_ca_02_4_el_archivo_vacio_da_su_motivo(carpeta_fixtures: Path) -> None
 
 def prueba_ca_02_4_el_jdx_truncado_da_su_motivo(carpeta_fixtures: Path) -> None:
     """Al fixture le falta `##END=`: el archivo se cortó a la mitad."""
-    veredicto = validar(
+    veredicto = validar_formato(
         "espectro-truncado.jdx", _texto(carpeta_fixtures / "espectro-truncado.jdx")
     )
 
@@ -215,7 +219,7 @@ def prueba_ca_02_4_el_jdx_truncado_da_su_motivo(carpeta_fixtures: Path) -> None:
 def prueba_ca_02_4_el_rechazo_trae_motivo_y_accion_sin_detalles_tecnicos(
     carpeta_fixtures: Path,
 ) -> None:
-    veredicto = validar(
+    veredicto = validar_formato(
         "espectro-truncado.jdx", _texto(carpeta_fixtures / "espectro-truncado.jdx")
     )
     mensaje = mensajes.obtener(veredicto.codigo)
@@ -253,7 +257,7 @@ def prueba_ca_02_4_ningun_archivo_hace_estallar_al_validador(
 ) -> None:
     """«No se detiene de forma abrupta»: siempre sale un veredicto, nunca una
     excepción."""
-    veredicto = validar(nombre, contenido)
+    veredicto = validar_formato(nombre, contenido)
 
     assert isinstance(veredicto, Veredicto)
     if not veredicto.valido:
@@ -264,16 +268,16 @@ def prueba_ca_02_4_despues_de_un_rechazo_el_siguiente_archivo_se_atiende(
     carpeta_fixtures: Path,
 ) -> None:
     """«Atiende la siguiente petición»: MOD-03 no guarda estado entre llamadas."""
-    primero = validar(
+    primero = validar_formato(
         "archivo-vacio.csv", _texto(carpeta_fixtures / "archivo-vacio.csv")
     )
-    segundo = validar(
+    segundo = validar_formato(
         "espectro-valido.jdx", _texto(carpeta_fixtures / "espectro-valido.jdx")
     )
-    tercero = validar(
+    tercero = validar_formato(
         "binario-disfrazado.csv", _texto(carpeta_fixtures / "binario-disfrazado.csv")
     )
-    cuarto = validar(
+    cuarto = validar_formato(
         "espectro-valido-900-puntos.csv",
         _texto(carpeta_fixtures / "espectro-valido-900-puntos.csv"),
     )
@@ -300,7 +304,7 @@ def prueba_ca_02_4_despues_de_un_rechazo_el_siguiente_archivo_se_atiende(
 def prueba_los_fixtures_validos_pasan_las_cuatro_capas(
     carpeta_fixtures: Path, archivo: str
 ) -> None:
-    veredicto = validar(archivo, _texto(carpeta_fixtures / archivo))
+    veredicto = validar_formato(archivo, _texto(carpeta_fixtures / archivo))
 
     assert veredicto.valido, veredicto.detalle
     assert veredicto.codigo is None
@@ -324,14 +328,14 @@ def prueba_lo_que_le_toca_a_t05_todavia_pasa(
     y T-05 los rechaza con «mínimo … puntos» y «se requiere cubrir al menos …».
     Si algún día esta prueba falla, alguien metió T-05 dentro de T-04.
     """
-    veredicto = validar(archivo, _texto(carpeta_fixtures / archivo))
+    veredicto = validar_formato(archivo, _texto(carpeta_fixtures / archivo))
 
     assert veredicto.valido, veredicto.detalle
 
 
 def prueba_t04_no_rechaza_por_cantidad_de_puntos() -> None:
     """Dos pares bastan para T-04; el mínimo de UT-03 lo aplica T-05."""
-    veredicto = validar("espectro.csv", "400.0,0.80\n4000.0,0.75\n")
+    veredicto = validar_formato("espectro.csv", "400.0,0.80\n4000.0,0.75\n")
 
     assert veredicto.valido
 
@@ -343,7 +347,7 @@ def prueba_t04_no_rechaza_por_cantidad_de_puntos() -> None:
 
 def prueba_un_jdx_con_nombre_de_csv_se_rechaza() -> None:
     """Extensión mentirosa (sección 9): el contenido no parsea como CSV."""
-    veredicto = validar("espectro.csv", JDX_VALIDO)
+    veredicto = validar_formato("espectro.csv", JDX_VALIDO)
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA
@@ -351,7 +355,7 @@ def prueba_un_jdx_con_nombre_de_csv_se_rechaza() -> None:
 
 
 def prueba_un_csv_con_nombre_de_jdx_se_rechaza() -> None:
-    veredicto = validar("espectro.jdx", CSV_VALIDO)
+    veredicto = validar_formato("espectro.jdx", CSV_VALIDO)
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA
@@ -376,7 +380,7 @@ def prueba_un_csv_con_nombre_de_jdx_se_rechaza() -> None:
     ],
 )
 def prueba_al_jdx_le_falta_una_pieza_y_se_rechaza(caso: str, contenido: str) -> None:
-    veredicto = validar("espectro.jdx", contenido)
+    veredicto = validar_formato("espectro.jdx", contenido)
 
     assert not veredicto.valido, caso
     assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA, caso
@@ -386,12 +390,12 @@ def prueba_el_jdx_acepta_tambien_la_tabla_de_picos() -> None:
     """UT-03 admite `##XYDATA=` o `##PEAK TABLE=`: basta una de las dos."""
     contenido = JDX_VALIDO.replace("##XYDATA=(XY..XY)", "##PEAK TABLE=(XY..XY)")
 
-    assert validar("espectro.jdx", contenido).valido
+    assert validar_formato("espectro.jdx", contenido).valido
 
 
 def prueba_el_jdx_tolera_lineas_en_blanco_al_final() -> None:
     """Un editor de texto agrega saltos al final; eso no es un archivo truncado."""
-    assert validar("espectro.jdx", JDX_VALIDO + "\n\n").valido
+    assert validar_formato("espectro.jdx", JDX_VALIDO + "\n\n").valido
 
 
 def prueba_las_etiquetas_obligatorias_salen_de_ut03() -> None:
@@ -400,16 +404,16 @@ def prueba_las_etiquetas_obligatorias_salen_de_ut03() -> None:
         "##TITLE=", "##JCAMP-DX=", "##XUNITS=", "##YUNITS=", "##END=", "##NPOINTS="
     )
 
-    assert validar("espectro.jdx", JDX_VALIDO).valido
-    assert not validar("espectro.jdx", JDX_VALIDO, configuracion=configuracion).valido
+    assert validar_formato("espectro.jdx", JDX_VALIDO).valido
+    assert not validar_formato("espectro.jdx", JDX_VALIDO, configuracion=configuracion).valido
 
 
 def prueba_los_formatos_permitidos_salen_de_ut03() -> None:
     """Si UT-03 cambia la lista, cambia qué extensiones pasan, sin tocar código."""
     configuracion = _con_formatos(".jdx")
 
-    assert validar("espectro.jdx", JDX_VALIDO, configuracion=configuracion).valido
-    rechazado = validar("espectro.csv", CSV_VALIDO, configuracion=configuracion)
+    assert validar_formato("espectro.jdx", JDX_VALIDO, configuracion=configuracion).valido
+    rechazado = validar_formato("espectro.csv", CSV_VALIDO, configuracion=configuracion)
     assert not rechazado.valido
     assert rechazado.codigo == mensajes.FORMATO_NO_SOPORTADO
 
@@ -424,7 +428,7 @@ def prueba_un_formato_permitido_que_mod_03_no_sabe_revisar_se_rechaza() -> None:
     """
     configuracion = _con_formatos(".txt")
 
-    veredicto = validar("espectro.txt", CSV_VALIDO, configuracion=configuracion)
+    veredicto = validar_formato("espectro.txt", CSV_VALIDO, configuracion=configuracion)
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA
@@ -444,23 +448,23 @@ def prueba_un_formato_permitido_que_mod_03_no_sabe_revisar_se_rechaza() -> None:
     ],
 )
 def prueba_al_csv_no_le_salen_los_pares_y_se_rechaza(caso: str, contenido: str) -> None:
-    veredicto = validar("espectro.csv", contenido)
+    veredicto = validar_formato("espectro.csv", contenido)
 
     assert not veredicto.valido, caso
     assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA, caso
 
 
 def prueba_el_csv_tolera_espacios_alrededor_de_los_numeros() -> None:
-    assert validar("espectro.csv", " 400.0 , 0.80 \n 500.0 , 0.75 \n").valido
+    assert validar_formato("espectro.csv", " 400.0 , 0.80 \n 500.0 , 0.75 \n").valido
 
 
 def prueba_el_csv_tolera_lineas_en_blanco_entre_filas() -> None:
-    assert validar("espectro.csv", "400.0,0.80\n\n500.0,0.75\n\n").valido
+    assert validar_formato("espectro.csv", "400.0,0.80\n\n500.0,0.75\n\n").valido
 
 
 def prueba_el_csv_acepta_notacion_cientifica() -> None:
     """Varios programas exportan así; sigue siendo un número."""
-    assert validar("espectro.csv", "4.0e2,8.0e-1\n5.0e2,7.5e-1\n").valido
+    assert validar_formato("espectro.csv", "4.0e2,8.0e-1\n5.0e2,7.5e-1\n").valido
 
 
 def prueba_el_csv_con_coma_decimal_pasa_t04_y_lo_atrapa_t05() -> None:
@@ -473,7 +477,7 @@ def prueba_el_csv_con_coma_decimal_pasa_t04_y_lo_atrapa_t05() -> None:
     rechazarlo sin inventar una regla. Pasa T-04 y lo atrapa T-05, porque los
     números de onda que salen (400, 500…) no cubren el rango requerido.
     """
-    veredicto = validar("espectro.csv", "400,0\n500,0\n600,0\n")
+    veredicto = validar_formato("espectro.csv", "400,0\n500,0\n600,0\n")
 
     assert veredicto.valido
 
@@ -485,27 +489,27 @@ def prueba_el_csv_con_coma_decimal_pasa_t04_y_lo_atrapa_t05() -> None:
 
 def prueba_el_csv_acepta_una_fila_de_encabezado() -> None:
     """§6.1 admite encabezado, así que rechazarlo era un incumplimiento."""
-    veredicto = validar("espectro.csv", "numero_de_onda,transmitancia\n" + CSV_VALIDO)
+    veredicto = validar_formato("espectro.csv", "numero_de_onda,transmitancia\n" + CSV_VALIDO)
 
     assert veredicto.valido, veredicto.detalle
 
 
 def prueba_el_csv_acepta_el_separador_de_punto_y_coma() -> None:
-    veredicto = validar("espectro.csv", "400.0;0.80\n500.0;0.75\n600.0;0.70\n")
+    veredicto = validar_formato("espectro.csv", "400.0;0.80\n500.0;0.75\n600.0;0.70\n")
 
     assert veredicto.valido, veredicto.detalle
 
 
 def prueba_el_csv_de_excel_en_espanol_se_acepta() -> None:
     """Punto y coma de separador **y** coma decimal: así exporta Excel aquí."""
-    veredicto = validar("espectro.csv", "400,0;0,805\n500,0;0,750\n600,0;0,700\n")
+    veredicto = validar_formato("espectro.csv", "400,0;0,805\n500,0;0,750\n600,0;0,700\n")
 
     assert veredicto.valido, veredicto.detalle
 
 
 def prueba_el_csv_acepta_encabezado_con_punto_y_coma() -> None:
     """Las dos cosas de §6.1 juntas, que es como llegan los archivos reales."""
-    veredicto = validar(
+    veredicto = validar_formato(
         "espectro.csv", "numero de onda;transmitancia\n400,0;0,805\n500,0;0,750\n"
     )
 
@@ -514,7 +518,7 @@ def prueba_el_csv_acepta_encabezado_con_punto_y_coma() -> None:
 
 def prueba_solo_se_perdona_una_fila_de_encabezado() -> None:
     """Dos filas sin números seguidas ya no son un encabezado."""
-    veredicto = validar(
+    veredicto = validar_formato(
         "espectro.csv", "onda,intensidad\nunidades,porcentaje\n" + CSV_VALIDO
     )
 
@@ -523,7 +527,7 @@ def prueba_solo_se_perdona_una_fila_de_encabezado() -> None:
 
 
 def prueba_un_archivo_con_solo_encabezado_no_trae_datos() -> None:
-    veredicto = validar("espectro.csv", "numero_de_onda,transmitancia\n")
+    veredicto = validar_formato("espectro.csv", "numero_de_onda,transmitancia\n")
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA
@@ -532,7 +536,7 @@ def prueba_un_archivo_con_solo_encabezado_no_trae_datos() -> None:
 
 def prueba_con_coma_de_separador_el_decimal_es_el_punto() -> None:
     """`400,0,0,805` son cuatro campos, no dos: el archivo no tiene esta forma."""
-    veredicto = validar("espectro.csv", "400,0,0,805\n500,0,0,750\n")
+    veredicto = validar_formato("espectro.csv", "400,0,0,805\n500,0,0,750\n")
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA
@@ -560,7 +564,7 @@ def prueba_separador_de(contenido: str, esperado: str) -> None:
 def prueba_los_fixtures_de_la_seccion_6_1_pasan(
     carpeta_fixtures: Path, archivo: str
 ) -> None:
-    veredicto = validar(archivo, _texto(carpeta_fixtures / archivo))
+    veredicto = validar_formato(archivo, _texto(carpeta_fixtures / archivo))
 
     assert veredicto.valido, veredicto.detalle
 
@@ -580,7 +584,7 @@ def prueba_los_fixtures_de_la_seccion_6_1_pasan(
     ],
 )
 def prueba_los_valores_implausibles_se_rechazan(caso: str, contenido: str) -> None:
-    veredicto = validar("espectro.csv", contenido)
+    veredicto = validar_formato("espectro.csv", contenido)
 
     assert not veredicto.valido, caso
     assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA, caso
@@ -592,7 +596,7 @@ def prueba_un_csv_de_una_sola_fila_no_es_un_espectro() -> None:
 
     No es el mínimo de UT-03 —eso es T-05—, es que con un punto no hay curva.
     """
-    veredicto = validar("espectro.csv", "400.0,0.80\n")
+    veredicto = validar_formato("espectro.csv", "400.0,0.80\n")
 
     assert not veredicto.valido
     assert veredicto.capa == CAPA_COHERENCIA
@@ -608,7 +612,7 @@ def prueba_un_jdx_sin_una_sola_linea_de_datos_se_rechaza() -> None:
         "##END=\n"
     )
 
-    veredicto = validar("espectro.jdx", contenido)
+    veredicto = validar_formato("espectro.jdx", contenido)
 
     assert not veredicto.valido
     assert veredicto.capa == CAPA_COHERENCIA
@@ -617,7 +621,7 @@ def prueba_un_jdx_sin_una_sola_linea_de_datos_se_rechaza() -> None:
 def prueba_un_jdx_con_numero_de_onda_negativo_se_rechaza() -> None:
     contenido = JDX_VALIDO.replace("400.0 0.80\n", "-400.0 0.80\n")
 
-    veredicto = validar("espectro.jdx", contenido)
+    veredicto = validar_formato("espectro.jdx", contenido)
 
     assert not veredicto.valido
     assert veredicto.capa == CAPA_COHERENCIA
@@ -634,7 +638,7 @@ def prueba_el_jdx_no_se_interpreta_mas_alla_de_lo_necesario() -> None:
         "400.0 0.80\n500.0 0.75\n", "400.0 J80K75j12%%\n"
     )
 
-    assert validar("espectro.jdx", contenido).valido
+    assert validar_formato("espectro.jdx", contenido).valido
 
 
 # --------------------------------------------------------------------------- #
@@ -648,8 +652,8 @@ def prueba_el_formato_se_revisa_antes_que_el_contenido(
     """Un PNG es binario **y** de formato no admitido: manda el formato."""
     contenido = _texto(carpeta_fixtures / "imagen.png")
 
-    como_png = validar("imagen.png", contenido)
-    como_csv = validar("imagen.csv", contenido)
+    como_png = validar_formato("imagen.png", contenido)
+    como_csv = validar_formato("imagen.csv", contenido)
 
     assert como_png.codigo == mensajes.FORMATO_NO_SOPORTADO
     assert como_csv.codigo == mensajes.ARCHIVO_NO_ES_TEXTO, (
@@ -659,13 +663,13 @@ def prueba_el_formato_se_revisa_antes_que_el_contenido(
 
 def prueba_el_texto_se_revisa_antes_que_la_estructura() -> None:
     """Un binario tampoco tiene estructura, pero el motivo honesto es el otro."""
-    veredicto = validar("espectro.jdx", "\x00\x00\x00")
+    veredicto = validar_formato("espectro.jdx", "\x00\x00\x00")
 
     assert veredicto.codigo == mensajes.ARCHIVO_NO_ES_TEXTO
 
 
 def prueba_la_estructura_se_revisa_antes_que_la_coherencia() -> None:
-    veredicto = validar("espectro.csv", "sin pares\n-400.0,0.80\n")
+    veredicto = validar_formato("espectro.csv", "sin pares\n-400.0,0.80\n")
 
     assert veredicto.capa == CAPA_ESTRUCTURA
 
@@ -682,7 +686,7 @@ def prueba_no_se_valida_contenido_cuyo_tamano_no_se_confirmo() -> None:
     alguien conecta mal los módulos, el indicador del contrato sirve de freno en
     vez de ser un campo decorativo.
     """
-    veredicto = validar("espectro.csv", CSV_VALIDO, tamano_correcto=False)
+    veredicto = validar_formato("espectro.csv", CSV_VALIDO, tamano_correcto=False)
 
     assert not veredicto.valido
     assert veredicto.codigo == mensajes.TAMANO_EXCEDIDO
@@ -695,7 +699,7 @@ def prueba_no_se_valida_contenido_cuyo_tamano_no_se_confirmo() -> None:
 
 
 def prueba_el_veredicto_valido_no_trae_codigo_ni_capa() -> None:
-    veredicto = validar("espectro.csv", CSV_VALIDO)
+    veredicto = validar_formato("espectro.csv", CSV_VALIDO)
 
     assert veredicto.valido
     assert veredicto.codigo is None
@@ -711,7 +715,7 @@ def prueba_todo_rechazo_se_puede_traducir_con_ut02() -> None:
 
     for nombre in casos:
         for contenido in contenidos:
-            veredicto = validar(nombre, contenido)
+            veredicto = validar_formato(nombre, contenido)
             assert not veredicto.valido
             mensaje = mensajes.obtener(veredicto.codigo)
             assert mensaje.texto.strip()
@@ -719,7 +723,7 @@ def prueba_todo_rechazo_se_puede_traducir_con_ut02() -> None:
 
 
 def prueba_el_veredicto_no_se_puede_modificar() -> None:
-    veredicto = validar("espectro.csv", CSV_VALIDO)
+    veredicto = validar_formato("espectro.csv", CSV_VALIDO)
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         veredicto.valido = False  # type: ignore[misc]
@@ -727,7 +731,7 @@ def prueba_el_veredicto_no_se_puede_modificar() -> None:
 
 def prueba_el_detalle_es_para_el_registro_no_para_el_usuario() -> None:
     """El detalle explica al equipo qué capa falló; el usuario ve UT-02."""
-    veredicto = validar("espectro.jdx", CSV_VALIDO)
+    veredicto = validar_formato("espectro.jdx", CSV_VALIDO)
 
     assert veredicto.detalle.strip(), "un rechazo debe decir al equipo por qué"
 
@@ -759,7 +763,7 @@ def prueba_los_registros_no_guardan_el_contenido_del_espectro(
     contenido = "400.0,0.512345\n500.0,0.698765\n"
 
     with caplog.at_level(logging.INFO):
-        veredicto = validar("acetona.csv", contenido)
+        veredicto = validar_formato("acetona.csv", contenido)
 
     registrado = "\n".join(r.getMessage() for r in caplog.records)
 
@@ -774,7 +778,7 @@ def prueba_el_registro_del_rechazo_dice_el_codigo(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     with caplog.at_level(logging.INFO):
-        veredicto = validar("imagen.png", "cualquier cosa")
+        veredicto = validar_formato("imagen.png", "cualquier cosa")
 
     registrado = "\n".join(r.getMessage() for r in caplog.records)
 
@@ -792,7 +796,7 @@ def prueba_un_csv_del_tamano_maximo_se_valida_sin_problema(
     csv_tamano_maximo: Path,
 ) -> None:
     """El archivo de CA-01.2, ahora visto por MOD-03."""
-    veredicto = validar("espectro-maximo.csv", _texto(csv_tamano_maximo))
+    veredicto = validar_formato("espectro-maximo.csv", _texto(csv_tamano_maximo))
 
     assert veredicto.valido, veredicto.detalle
 
@@ -800,10 +804,10 @@ def prueba_un_csv_del_tamano_maximo_se_valida_sin_problema(
 def prueba_un_jdx_grande_se_valida_sin_problema() -> None:
     contenido = jdx_sintetico("GRANDE", 20000, 400.0, 4000.0).decode("ascii")
 
-    assert validar("grande.jdx", contenido).valido
+    assert validar_formato("grande.jdx", contenido).valido
 
 
 def prueba_un_csv_grande_se_valida_sin_problema() -> None:
     contenido = csv_sintetico(20000, 400.0, 4000.0).decode("ascii")
 
-    assert validar("grande.csv", contenido).valido
+    assert validar_formato("grande.csv", contenido).valido
