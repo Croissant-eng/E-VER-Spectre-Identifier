@@ -12,6 +12,8 @@ diría gran cosa.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -258,6 +260,76 @@ def prueba_los_pesados_no_estan_en_el_repositorio() -> None:
     ]
 
     assert not grandes, f"estos archivos de prueba no deberían estar aquí: {grandes}"
+
+
+# --------------------------------------------------------------------------- #
+# Los espectros reales: no se versionan, se reproducen
+# --------------------------------------------------------------------------- #
+
+RAIZ = Path(__file__).resolve().parents[2]
+MANIFIESTO = RAIZ / "herramientas" / "espectros_nist.json"
+
+
+def prueba_los_espectros_reales_no_se_versionan() -> None:
+    """Son de la Coblentz Society y llevan copyright: commitearlos en un repo
+    público sería redistribuirlos. Lo que se versiona es el script más el
+    manifiesto que los reproduce."""
+    reglas = (RAIZ / ".gitignore").read_text(encoding="utf-8")
+
+    assert "datos/referencia/*" in reglas, (
+        "datos/referencia/ debe seguir en .gitignore: ahí viven los espectros "
+        "con copyright"
+    )
+    assert MANIFIESTO.is_file(), "falta el manifiesto que los reproduce"
+    assert (RAIZ / "herramientas" / "descargar_espectros_nist.py").is_file()
+
+
+def prueba_el_manifiesto_describe_los_tres_espectros() -> None:
+    manifiesto = json.loads(MANIFIESTO.read_text(encoding="utf-8"))
+    espectros = manifiesto["espectros"]
+
+    assert len(espectros) == 3
+    for espectro in espectros:
+        for llave in (
+            "archivo",
+            "compuesto",
+            "cas",
+            "id_nist",
+            "indice",
+            "fase",
+            "puntos",
+            "bytes",
+            "sha256",
+        ):
+            assert espectro.get(llave) not in (None, ""), (
+                f"a {espectro.get('archivo')} le falta «{llave}»"
+            )
+        assert len(espectro["sha256"]) == 64
+
+
+def prueba_los_espectros_de_disco_coinciden_con_el_manifiesto() -> None:
+    """Si los archivos están descargados, deben ser los del manifiesto. En un
+    clon recién hecho no están, y entonces esta prueba se salta."""
+    manifiesto = json.loads(MANIFIESTO.read_text(encoding="utf-8"))
+    carpeta = RAIZ / manifiesto["carpeta_destino"]
+
+    presentes = [
+        espectro
+        for espectro in manifiesto["espectros"]
+        if (carpeta / espectro["archivo"]).is_file()
+    ]
+    if not presentes:
+        pytest.skip(
+            "los espectros reales no están descargados; córralos con "
+            "«python -m herramientas.descargar_espectros_nist»"
+        )
+
+    for espectro in presentes:
+        datos = (carpeta / espectro["archivo"]).read_bytes()
+        assert len(datos) == espectro["bytes"], espectro["archivo"]
+        assert hashlib.sha256(datos).hexdigest() == espectro["sha256"], (
+            f"{espectro['archivo']} no es el espectro del manifiesto"
+        )
 
 
 # --------------------------------------------------------------------------- #

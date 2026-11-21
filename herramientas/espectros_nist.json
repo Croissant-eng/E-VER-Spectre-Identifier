@@ -1,0 +1,82 @@
+{
+  "_descripcion": "Manifiesto de los espectros reales de NIST Chemistry WebBook que usa el proyecto a partir del incremento 2. Los archivos NO se versionan: son de la Coblentz Society y llevan copyright, así que commitearlos sería redistribuirlos. Este manifiesto más herramientas/descargar_espectros_nist.py los reproducen.",
+  "_licencia": "Collection © copyright by the U.S. Secretary of Commerce on behalf of the United States of America. All rights reserved. Ácido benzoico: © 1988 by Coblentz Society Inc. Uso académico; no redistribuir.",
+  "_registro": "docs/plan/incremento-1.md, sección 11 («Espectros reales ya elegidos»).",
+  "carpeta_destino": "datos/referencia",
+  "espectros": [
+    {
+      "archivo": "67-64-1-IR.jdx",
+      "compuesto": "Acetona",
+      "cas": "67-64-1",
+      "id_nist": "C67641",
+      "indice": 3,
+      "tipo": "IR",
+      "origen": "COBLENTZ III · WESTERN REGIONAL RES. USDA · COBLENTZ NO. 6189",
+      "imagen_nist": "cob6189",
+      "fase": "SOLUTION (10% en CCl4 para 4000-1330 cm-1, 10% en CS2 para 1330-600 cm-1)",
+      "instrumento": "BECKMAN IR-7 (GRATING)",
+      "resolucion_cm1": 4,
+      "yunits": "TRANSMITTANCE",
+      "primer_x": 598.702,
+      "ultimo_x": 3983.5,
+      "puntos": 5216,
+      "bytes": 49990,
+      "sha256": "1b5d5154286e38696bede15134d8c9cbe6f46dcde83ed08b1135fc8e6750d713",
+      "para": "CA-05.1 (incremento 3): C=O de cetona.",
+      "notas": "Fase condensada; cubre hasta 4000 como el eje de la gráfica. No hay espectro de líquido puro disponible. El archivo declara contaminación de CCl4 cerca de 1550 cm-1, que cae en el rango de GF-07 (anillo aromático) aunque la acetona no tiene anillo: posible falso positivo en el incremento 3."
+    },
+    {
+      "archivo": "65-85-0-IR.jdx",
+      "compuesto": "Ácido benzoico",
+      "cas": "65-85-0",
+      "id_nist": "C65850",
+      "indice": 4,
+      "tipo": "IR",
+      "origen": "COBLENTZ III · DOW CHEMICAL COMPANY · COBLENTZ NO. 06267",
+      "imagen_nist": "cob6267",
+      "fase": "SOLID (SPLIT MULL)",
+      "instrumento": "DOW KBr FOREPRISM-GRATING",
+      "resolucion_cm1": 2,
+      "yunits": "TRANSMITTANCE",
+      "primer_x": 3816.0,
+      "ultimo_x": 453.0,
+      "puntos": 3364,
+      "bytes": 32496,
+      "sha256": "e4741d4f7427c6936ce29e872f9109fd2ce7bbb2a61d8b9de70b8d7e24857e4b",
+      "para": "CA-05.2 (incremento 3): O-H ancho de ácido carboxílico.",
+      "notas": "Fase condensada a propósito: la banda ancha de O-H viene de los puentes de hidrógeno, que en fase gas desaparecen. El «split mull» evita que las bandas C-H del nujol contaminen 2850-2960 (GF-03). El eje va de mayor a menor y ##DELTAX= dice +1 cuando debería ser -1: MOD-04 debe deducir la dirección comparando primer_x con ultimo_x, nunca por el signo de DELTAX (T-08/T-09, CA-03.2)."
+    },
+    {
+      "archivo": "62-53-3-IR.jdx",
+      "compuesto": "Anilina",
+      "cas": "62-53-3",
+      "id_nist": "C62533",
+      "indice": 2,
+      "tipo": "IR",
+      "origen": "COBLENTZ III · WESTERN REGIONAL RES. USDA · COBLENTZ NO. 9869",
+      "imagen_nist": "cob9869",
+      "fase": "LIQUID (NEAT)",
+      "instrumento": "BECKMAN IR-7 (GRATING)",
+      "resolucion_cm1": 4,
+      "yunits": "TRANSMITTANCE",
+      "primer_x": 600.0,
+      "ultimo_x": 3952.43,
+      "puntos": 4158,
+      "bytes": 39979,
+      "sha256": "da1e4d8b6016210d1a2b75b95e2cdce41c186313c96eba9ca046c2169b2c2a8f",
+      "para": "GF-02 (incremento 3): los dos picos N-H de amina primaria.",
+      "notas": "Líquido puro, el caso más limpio de los tres."
+    }
+  ],
+  "_descartados": [
+    {
+      "compuesto": "Ácido benzoico (PNNL/Johnson)",
+      "motivo": "##YUNITS=Reflectance (reflectancia difusa con esfera integradora). §6.1 solo admite transmitancia o absorbancia."
+    },
+    {
+      "compuesto": "Etanol (PNNL/Myers)",
+      "motivo": "##YUNITS=dispersion index, ##YLABEL=Real refractive index: no es un espectro de absorción sino el índice de refracción real."
+    }
+  ],
+  "_pendiente": "Ningún CA valida ##YUNITS=, así que hoy los dos descartados pasarían MOD-03 y llegarían a MOD-04. Validar la unidad es la decisión abierta de la sección 11 del plan: requiere aprobación del equipo."
+}

@@ -14,9 +14,17 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Datos pesados (respaldar aparte; ver riesgo de dataset en el plan)
+# Espectros reales de NIST: son de la Coblentz Society y llevan copyright, asi
+# que commitearlos en un repo publico seria redistribuirlos (decision de la
+# seccion «Licencias» del plan; riesgo abierto n.o 4 de Requerimientos V3.1).
+# Se reproducen con herramientas/descargar_espectros_nist.py y su manifiesto.
+# Los archivos de prueba fabricados de datos/pruebas/ SI van versionados: no
+# contienen datos de terceros.
 datos/referencia/*
 !datos/referencia/.gitkeep
+
+# Pesos del modelo de MOD-06: datos pesados, se respaldan aparte (ver el riesgo
+# de dataset del plan).
 motor-identificacion/modelo/*
 !motor-identificacion/modelo/.gitkeep
 
