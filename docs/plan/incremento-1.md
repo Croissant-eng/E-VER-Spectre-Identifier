@@ -27,6 +27,7 @@ Resumen operativo para la implementación. **Fuentes (única verdad):** Requerim
 | D-5 | **Contrato HTTP:** `POST /api/validar` (sección 5). | MOD-01 nunca llama a MOD-02/MOD-03 directamente; pasa por `backend/api/`. |
 | D-6 | **Archivo de configuración: `parametros.json`, versionado.** Se renombra `parametros.ejemplo.json` → `parametros.json`. | El sufijo `.ejemplo` es convención de «plantilla para copiar» (como `.env.ejemplo`) y aquí engañaba: este archivo **es** la fuente operativa, no una plantilla. Sin variante `.ejemplo`. Va commiteado y `.gitignore` **no** debe ignorarlo (la antideriva depende de que esté versionado). Conservar la prueba que falla si aparece un segundo `parametros*.json`. `cargador.py` lee `parametros.json`. |
 | D-7 | **Carpetas de paquetes Python del backend usan guion bajo, no guion.** `manejador-archivos` → `manejador_archivos`; en inc. 3, `motor-identificacion` → `motor_identificacion`. | Un guion no es identificador válido de Python: `import` sobre esa carpeta es error de sintaxis. Aplica **solo a carpetas que Python importa como paquete**. Las del frontend (`interfaz/`, `servicios/`, `visor-espectro/`) conservan el guion. Desviación justificada del Diseño Modular §10, permitida por su propia nota («los nombres anticipan los módulos») y por el checklist del Paso 9; se registra en la bitácora, no es cambio de arquitectura. |
+| D-8 | **Datos de prueba fabricados en `datos/pruebas/` (commiteados); `backend/pruebas/` solo código (RNF-06).** | Coherente con Diseño Modular §10 (`datos/` es el hogar de datos estáticos) y deja `datos/pruebas/` junto a `datos/referencia/`. Se elimina la carpeta vacía `backend/pruebas/archivos/` y se alinea esa fila de `CLAUDE.md`. |
 
 ## 2. Datos y persistencia (Paso 5 + Persistencia v2.0)
 
@@ -68,7 +69,7 @@ Con esos cuatro queda cubierta la redacción obligatoria. Quedan cuatro situacio
 ## 5. Contratos entre módulos (Plan V3) — sin código
 
 - **UT-03 → MOD-02 / MOD-03:** los parámetros (tamaño máximo, formatos permitidos, puntos mínimos, rango, etiquetas).
-- **MOD-02 → MOD-03:** el contenido del archivo **como texto**, su nombre y un indicador de «tamaño correcto»; o un **rechazo con código**.
+- **MOD-02 → MOD-03:** el contenido del archivo **como texto** (UTF-8, BOM descartado con `utf-8-sig`; los bytes inválidos llegan como el carácter de reemplazo `U+FFFD` «�», por `errors="replace"`), su nombre y un indicador de «tamaño correcto»; o un **rechazo con código**. MOD-02 no juzga contenido: la capa «¿es texto?» de MOD-03 (T-04) debe tratar como binario tanto `\x00` como `U+FFFD`, que es donde ahora aparecen los bytes inválidos.
 - **MOD-03 → MOD-01:** un **veredicto**: válido sí/no y, si no, motivo + código.
 - **UT-02 → todos:** dado un código, devuelve **título, texto y acción sugerida**.
 - **MOD-01 → usuario:** vista de «aceptado» o «rechazado con mensaje».
@@ -97,8 +98,9 @@ Ya creada conforme al Diseño Modular v2.0 §10. Carpetas de este incremento:
 | `backend/utilerias/configuracion/` | UT-03 · archivo de parámetros (ya creado) |
 | `backend/utilerias/mensajes/` | UT-02 |
 | `backend/nucleo/` | infraestructura base: arranque de la app, logging, utilidades compartidas. Está en Diseño Modular §10; no es un MOD numerado ni tiene CA. En inc. 1 puede alojar el logging que pide T-03 o quedar mínimo. |
-| `backend/pruebas/` | RNF-06 |
-| `datos/referencia/` | espectros de prueba (NO datos de usuario) |
+| `backend/pruebas/` | RNF-06 · solo código de prueba, sin datos (D-8) |
+| `datos/pruebas/` | fixtures fabricados, commiteados (D-8) |
+| `datos/referencia/` | espectros reales (en `.gitignore`; ver Licencias) |
 
 **Verificación previa (T-00):** que el archivo de configuración exista y sea el que el código va a cargar (D-6), que `.gitignore` excluya cualquier archivo subido por el usuario, y que el README diga cómo levantar el backend y abrir el frontend.
 
@@ -157,16 +159,20 @@ Cada tarea termina cuando pasan las pruebas que se nombran en ella (detalle en l
 - **Pruebas:** CA-01.2, CA-02.2 y las **tres de RNF-09**.
 
 ### T-04 · MOD-03 Validador (contenido real) — `backend/validacion/`
-- **Objetivo:** confirmar que el contenido **es de verdad** del formato, sin confiar en la extensión. Tres capas, cada una con su rechazo:
-  1. **¿Es texto?** Bytes nulos o no imprimibles → rechazo inmediato (defensa RNF-03: nunca interpretamos binario).
-  2. **¿La estructura coincide con el formato declarado?** `.jdx`: etiquetas obligatorias de UT-03, con `##TITLE=` en la primera línea y `##END=` en la última, más una de las etiquetas de datos. `.csv`: las primeras filas parsean como pares numéricos (número de onda, intensidad) separados por coma.
+- **Objetivo:** confirmar que el contenido **es de verdad** del formato. La extensión se revisa, pero no se confía solo en ella. Cuatro capas, cada una con su rechazo:
+  0. **¿La extensión está permitida?** `.jdx` o `.csv` (lista de UT-03). Si no (`.png`, etc.) → **E-FORMATO-NO-SOPORTADO** (CA-01.3). Va **antes** que «¿es texto?» para que un `.png` dé el mensaje de formato, no el de binario.
+  1. **¿Es texto?** Bytes nulos, no imprimibles, o el carácter de reemplazo `U+FFFD` «�» (donde MOD-02 dejó los bytes inválidos; ver contrato §5) → rechazo inmediato (defensa RNF-03: nunca interpretamos binario).
+  2. **¿La estructura coincide con el formato declarado?** `.jdx`: etiquetas obligatorias de UT-03, con `##TITLE=` en la primera línea y `##END=` en la última, más una de las etiquetas de datos. `.csv`: las primeras filas de datos parsean como pares numéricos (número de onda, intensidad), con separador **coma o punto y coma** y una **fila de encabezado opcional** no numérica — ambas cosas las exige **Requerimientos §6.1**, así que rechazar un encabezado válido es un incumplimiento. Con separador `;` los campos pueden traer decimal con coma (Excel en español, `400,0;0,805`); con separador `,` el decimal es punto. (La conversión numérica real es de MOD-04; aquí solo se confirma que *parece* pares numéricos.)
   3. **¿Coherencia mínima?** Número razonable de filas y valores plausibles (número de onda positivo).
 - **Separación clave:** aquí se responde «¿es de verdad este formato?»; «¿cumple los requisitos?» es T-05.
 - **Pruebas:** CA-01.3, CA-02.4, CA-02.5.
 
 ### T-05 · MOD-03 Validador (puntos y rango)
-- **Objetivo:** **lectura ligera**: contar puntos y mirar mínimo/máximo del número de onda. **No normaliza, no ordena, no convierte** (eso es MOD-04, incremento 2).
-- **Pruebas:** CA-02.1, CA-02.3, CA-02.6.
+- **Objetivo:** **lectura ligera**: contar puntos y mirar mínimo/máximo del número de onda, contra `validacion.puntos_minimos` (300) y `validacion.rango_requerido_cm1` (1400–3700). **No normaliza, no ordena, no convierte** (eso es MOD-04, incremento 2).
+- **CSV:** recorre **todas** las filas de datos (T-04 solo miró las primeras diez, por eso hoy pasa un CSV con basura al final); cuenta pares y toma min/máx de la primera columna; salta el encabezado si lo hay.
+- **`.jdx`:** lee `##NPOINTS=` (puntos) y `##FIRSTX=`/`##LASTX=` (rango) del **encabezado** — texto ASCII, **no se descomprime el bloque XYDATA** (eso es MOD-04). Si faltan esas etiquetas, **falla cerrado** (igual que la decisión de fail-closed de T-04). Por eso **T-05 no necesita D-2**: D-2 sigue siendo decisión del incremento 2, antes de T-08.
+- **Mensajes literales:** «Mínimo 300 puntos» (CA-02.6) y «Se requiere cubrir al menos 1400–3700 cm⁻¹» (CA-02.3).
+- **Pruebas:** CA-02.1, CA-02.3, CA-02.6 (fixtures CSV: `espectro-un-punto-menos.csv`, `espectro-puntos-minimos.csv`, `espectro-rango-corto.csv`).
 
 ### T-06 · MOD-01 Interfaz mínima — `frontend/interfaz/`
 - **Objetivo:** subir el archivo y mostrar el veredicto (HTML/CSS/JS puro), contra veredictos simulados mientras avanzan T-03/04/05.
