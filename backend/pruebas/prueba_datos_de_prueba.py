@@ -51,6 +51,8 @@ ESPERADOS = (
     "espectro-valido.jdx",
     "espectro-valido-900-puntos.csv",
     "espectro-puntos-minimos.csv",
+    "espectro-con-encabezado.csv",
+    "espectro-punto-y-coma.csv",
     "espectro-un-punto-menos.csv",
     "espectro-rango-corto.csv",
     "espectro-truncado.jdx",
@@ -141,6 +143,50 @@ def prueba_el_csv_del_minimo_exacto_tiene_los_puntos_de_ut03(
 
     assert len(pares) == obtener_configuracion().validacion.puntos_minimos
     assert _cubre_el_rango_requerido(pares)
+
+
+def prueba_el_csv_con_encabezado_trae_su_fila_de_titulos(
+    carpeta_fixtures: Path,
+) -> None:
+    """Requerimientos §6.1 admite encabezado: el fixture debe traer uno de
+    verdad, con los mismos puntos y rango que el CSV normal."""
+    lineas = (
+        (carpeta_fixtures / "espectro-con-encabezado.csv")
+        .read_text(encoding="ascii")
+        .splitlines()
+    )
+
+    primera = lineas[0].split(",")
+    assert len(primera) == 2
+    for campo in primera:
+        with pytest.raises(ValueError):
+            float(campo)
+
+    pares = [
+        (float(a), float(b))
+        for a, b in (linea.split(",") for linea in lineas[1:] if linea.strip())
+    ]
+    assert len(pares) == PUNTOS_CSV_NORMAL
+    assert _cubre_el_rango_requerido(pares)
+
+
+def prueba_el_csv_de_punto_y_coma_usa_punto_y_coma_y_decimal_de_coma(
+    carpeta_fixtures: Path,
+) -> None:
+    """El otro caso de §6.1: así exporta Excel en español."""
+    texto = (carpeta_fixtures / "espectro-punto-y-coma.csv").read_text(
+        encoding="ascii"
+    )
+    lineas = [linea for linea in texto.splitlines() if linea.strip()]
+
+    assert ";" in lineas[0], "el separador tiene que ser punto y coma"
+    pares = [
+        tuple(float(campo.replace(",", ".")) for campo in linea.split(";"))
+        for linea in lineas
+    ]
+    assert all(len(par) == 2 for par in pares)
+    assert len(pares) == PUNTOS_CSV_NORMAL
+    assert _cubre_el_rango_requerido(pares)  # type: ignore[arg-type]
 
 
 # --------------------------------------------------------------------------- #

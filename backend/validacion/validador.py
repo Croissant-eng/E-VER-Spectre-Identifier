@@ -18,7 +18,8 @@ con los bytes que no eran texto válido convertidos en el carácter de reemplazo
 2. **¿La estructura es la del formato declarado?** — `.jdx`: las etiquetas
    obligatorias de UT-03, con `##TITLE=` en la primera línea y `##END=` en la
    última, más una de las etiquetas de datos. `.csv`: las primeras filas
-   parsean como pares numéricos separados por coma.
+   parsean como pares numéricos, con separador **coma o punto y coma** y una
+   **fila de encabezado opcional**, que es lo que admite Requerimientos §6.1.
 3. **Coherencia mínima** — que haya datos y que los números de onda sean
    positivos y utilizables.
 
@@ -92,8 +93,15 @@ FILAS_MINIMAS: int = 2
 #: Un par es «número de onda, intensidad»: dos columnas, ni una más.
 COLUMNAS_CSV: int = 2
 
-#: El separador del `.csv`, según el plan (sección 8, T-04).
-SEPARADOR_CSV: str = ","
+#: Los dos separadores que admite Requerimientos §6.1. La coma va primero:
+#: gana los empates al adivinar cuál usa un archivo.
+SEPARADOR_COMA: str = ","
+SEPARADOR_PUNTO_Y_COMA: str = ";"
+SEPARADORES: tuple[str, ...] = (SEPARADOR_COMA, SEPARADOR_PUNTO_Y_COMA)
+
+#: Nombre anterior del separador, cuando solo se admitía la coma. Se conserva
+#: para no romper a quien ya lo importaba.
+SEPARADOR_CSV: str = SEPARADOR_COMA
 
 #: Los dos formatos que MOD-03 sabe revisar hoy. UT-03 decide cuáles se
 #: *admiten*; esto es lo que este módulo sabe *inspeccionar*. Si UT-03 admite
@@ -301,36 +309,90 @@ def _revisar(
 # --------------------------------------------------------------------------- #
 
 
+def separador_de(contenido: str) -> str:
+    """Adivina con qué separador está escrito el `.csv`.
+
+    Requerimientos §6.1 admite **coma o punto y coma**, así que hay que
+    averiguar cuál usa el archivo antes de leerlo. La regla es simple y
+    explicable: gana el separador que parta la primera fila con contenido en
+    exactamente dos columnas. Si ninguno lo logra se devuelve la coma, y la
+    lectura falla con un motivo claro; si lo logran los dos, gana la coma.
+
+    La primera fila sirve para esto incluso cuando es un encabezado: el
+    encabezado usa el mismo separador que los datos.
+    """
+    primera = next((l for l in contenido.splitlines() if l.strip()), "")
+    for separador in SEPARADORES:
+        if len(primera.split(separador)) == COLUMNAS_CSV:
+            return separador
+    return SEPARADOR_COMA
+
+
+def _par(campos: list[str], separador: str) -> tuple[float, float] | None:
+    """El par «número de onda, intensidad» de una fila, o ``None`` si no lo es.
+
+    Con punto y coma, los campos pueden traer **decimal con coma** —así exporta
+    Excel en español: `400,0;0,805`— y se cambia por punto antes de leerlos.
+    Con coma como separador, el decimal es el punto, porque `400,0` ya se
+    partió en dos campos.
+
+    Aquí solo se confirma que el archivo **parece** pares de números; la
+    conversión que de verdad se usa para graficar y analizar es de MOD-04
+    (incremento 2).
+    """
+    if len(campos) != COLUMNAS_CSV:
+        return None
+
+    valores: list[float] = []
+    for campo in campos:
+        texto = campo.strip()
+        if separador == SEPARADOR_PUNTO_Y_COMA:
+            texto = texto.replace(SEPARADOR_COMA, ".")
+        try:
+            valores.append(float(texto))
+        except ValueError:
+            return None
+
+    return valores[0], valores[1]
+
+
 def _revisar_csv(contenido: str) -> _Fallo | None:
     """Las primeras filas tienen que ser pares «número de onda, intensidad».
 
-    Una fila con una sola columna, con tres, con un campo vacío o con texto
-    (incluido un encabezado como «onda,intensidad») significa que el archivo no
-    es el CSV de dos columnas que el formato pide.
+    Se admite **una fila de encabezado** al principio (`onda,intensidad`), que
+    es lo que exporta casi cualquier programa y lo que Requerimientos §6.1
+    permite: una primera fila de dos columnas que no son números se salta. La
+    segunda que no sean números ya es un archivo que no tiene esta forma.
     """
+    separador = separador_de(contenido)
     pares: list[tuple[float, float]] = []
+    encabezado = False
 
     for linea in contenido.splitlines():
         if not linea.strip():
             continue
 
-        campos = [campo.strip() for campo in linea.split(SEPARADOR_CSV)]
-        if len(campos) != COLUMNAS_CSV:
-            return _Fallo(
-                CAPA_ESTRUCTURA,
-                "una de las primeras filas no trae dos columnas separadas por "
-                "coma",
-            )
-        try:
-            onda = float(campos[0])
-            intensidad = float(campos[1])
-        except ValueError:
+        campos = linea.split(separador)
+        par = _par(campos, separador)
+
+        if par is None:
+            # El cupo del encabezado: solo la primera fila, y solo si trae el
+            # número de columnas correcto (un título suelto no es encabezado).
+            if not pares and not encabezado and len(campos) == COLUMNAS_CSV:
+                encabezado = True
+                continue
+            if len(campos) != COLUMNAS_CSV:
+                return _Fallo(
+                    CAPA_ESTRUCTURA,
+                    "una de las primeras filas no trae dos columnas separadas "
+                    f"por «{separador}»",
+                )
             return _Fallo(
                 CAPA_ESTRUCTURA,
                 "una de las primeras filas no trae un par de números",
             )
 
-        pares.append((onda, intensidad))
+        pares.append(par)
         if len(pares) >= FILAS_A_REVISAR:
             break
 
@@ -454,7 +516,10 @@ def _primer_numero_de_onda_plausible(linea: str) -> _Fallo | None:
     campo no se lee como número, se deja pasar en vez de rechazar un archivo
     por no entenderlo; si sí se lee, tiene que ser un número de onda posible.
     """
-    campos = linea.replace(SEPARADOR_CSV, " ").split()
+    sin_separadores = linea
+    for separador in SEPARADORES:
+        sin_separadores = sin_separadores.replace(separador, " ")
+    campos = sin_separadores.split()
     if not campos:  # pragma: no cover - las líneas vacías ya se filtraron
         return None
 

@@ -76,6 +76,22 @@ def generar(carpeta: Path = CARPETA_PRUEBAS) -> list[tuple[str, int]]:
             PUNTOS_CSV_NORMAL, DESDE, HASTA
         ),
         "espectro-puntos-minimos.csv": csv_sintetico(minimos, DESDE, HASTA),
+        # Las dos formas que Requerimientos §6.1 admite y que casi cualquier
+        # programa exporta: encabezado de columnas, y punto y coma con decimal
+        # de coma (Excel en español).
+        "espectro-con-encabezado.csv": csv_sintetico(
+            PUNTOS_CSV_NORMAL,
+            DESDE,
+            HASTA,
+            encabezado=("numero_de_onda_cm-1", "transmitancia"),
+        ),
+        "espectro-punto-y-coma.csv": csv_sintetico(
+            PUNTOS_CSV_NORMAL,
+            DESDE,
+            HASTA,
+            separador=";",
+            decimal_coma=True,
+        ),
         # --- Casos de rechazo ---------------------------------------------- #
         "espectro-un-punto-menos.csv": csv_sintetico(minimos - 1, DESDE, HASTA),
         "espectro-rango-corto.csv": csv_sintetico(

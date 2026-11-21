@@ -53,12 +53,47 @@ def _numeros_de_onda(puntos: int, desde: float, hasta: float) -> list[float]:
     return [desde + indice * paso for indice in range(puntos)]
 
 
-def csv_sintetico(puntos: int, desde: float, hasta: float) -> bytes:
-    """Un CSV de dos columnas con `puntos` pares, de `desde` a `hasta` cm⁻¹."""
+def csv_sintetico(
+    puntos: int,
+    desde: float,
+    hasta: float,
+    *,
+    encabezado: tuple[str, str] | None = None,
+    separador: str = ",",
+    decimal_coma: bool = False,
+) -> bytes:
+    """Un CSV de dos columnas con `puntos` pares, de `desde` a `hasta` cm⁻¹.
+
+    Sin argumentos de más produce exactamente los mismos bytes que antes: los
+    archivos de prueba ya commiteados no cambian.
+
+    Args:
+        encabezado: nombres de las dos columnas, si el archivo lleva encabezado.
+        separador: `","` o `";"`; Requerimientos §6.1 admite los dos.
+        decimal_coma: escribe los decimales con coma, como exporta Excel en
+            español. Solo tiene sentido con `";"` de separador, porque con coma
+            el número se partiría en dos campos.
+    """
+    if decimal_coma and separador == ",":
+        raise ValueError(
+            "con coma de separador no se puede usar coma decimal: la fila "
+            "quedaría con cuatro campos"
+        )
+
+    def fila(x: float, y: float) -> str:
+        # Los campos se arman por separado: si se reemplazara el punto en la
+        # línea completa, el decimal y el separador se confundirían.
+        campo_x, campo_y = f"{x:.4f}", f"{y:.6f}"
+        if decimal_coma:
+            campo_x, campo_y = campo_x.replace(".", ","), campo_y.replace(".", ",")
+        return campo_x + separador + campo_y
+
     lineas = [
-        _FORMATO_CSV.format(x=x, y=_intensidad(indice, puntos))
+        fila(x, _intensidad(indice, puntos))
         for indice, x in enumerate(_numeros_de_onda(puntos, desde, hasta))
     ]
+    if encabezado is not None:
+        lineas.insert(0, separador.join(encabezado))
     return ("\n".join(lineas) + "\n").encode("ascii")
 
 

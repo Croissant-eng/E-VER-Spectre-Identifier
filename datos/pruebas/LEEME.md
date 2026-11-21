@@ -30,6 +30,8 @@ delata.
 | `espectro-valido.jdx` | `.jdx` válido: etiquetas obligatorias de UT-03, `##TITLE=` en la primera línea, `##END=` en la última, `##XYDATA=` con 900 pares de 400 a 4000 cm⁻¹ | CA-01.1 |
 | `espectro-valido-900-puntos.csv` | CSV de dos columnas, 900 puntos, 400–4000 cm⁻¹ | CA-02.1 |
 | `espectro-puntos-minimos.csv` | CSV con **exactamente** los puntos mínimos de UT-03 (hoy 300), cubriendo el rango requerido: la mitad que debe aceptarse | CA-02.6 |
+| `espectro-con-encabezado.csv` | CSV de 900 puntos con una **fila de encabezado** (`numero_de_onda_cm-1,transmitancia`), como exporta casi cualquier programa. Requerimientos §6.1 lo admite, así que tiene que **aceptarse** | CA-02.1 · §6.1 |
+| `espectro-punto-y-coma.csv` | CSV de 900 puntos con separador **punto y coma** y **decimal de coma** (`400,0000;0,800000`), como exporta Excel en español. Requerimientos §6.1 admite los dos separadores, así que tiene que **aceptarse** | CA-02.1 · §6.1 |
 | `espectro-un-punto-menos.csv` | CSV con **un punto menos** que el mínimo (hoy 299). Cubre el rango de sobra, para que el conteo sea la única razón posible de rechazo | CA-02.6 |
 | `espectro-rango-corto.csv` | CSV de 900 puntos que arranca en 1500 cm⁻¹: no alcanza el extremo inferior del rango requerido. Puntos de sobra, así que el rango es la única razón de rechazo | CA-02.3 |
 | `espectro-truncado.jdx` | `.jdx` cortado: tiene `##TITLE=` y `##XYDATA=`, le falta `##END=` | CA-02.4 |

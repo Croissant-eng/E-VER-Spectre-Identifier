@@ -25,9 +25,13 @@ from backend.validacion.validador import (
     EXTENSION_JDX,
     FILAS_A_REVISAR,
     FILAS_MINIMAS,
+    SEPARADOR_COMA,
     SEPARADOR_CSV,
+    SEPARADOR_PUNTO_Y_COMA,
+    SEPARADORES,
     Veredicto,
     extension_de,
+    separador_de,
     validar,
 )
 
@@ -42,8 +46,12 @@ __all__ = [
     "EXTENSION_JDX",
     "FILAS_A_REVISAR",
     "FILAS_MINIMAS",
+    "SEPARADOR_COMA",
     "SEPARADOR_CSV",
+    "SEPARADOR_PUNTO_Y_COMA",
+    "SEPARADORES",
     "Veredicto",
     "extension_de",
+    "separador_de",
     "validar",
 ]

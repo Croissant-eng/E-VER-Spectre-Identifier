@@ -37,6 +37,7 @@ from backend.validacion import (
     CAPA_TEXTO,
     Veredicto,
     extension_de,
+    separador_de,
     validar,
 )
 from herramientas.generador_espectros import csv_sintetico, jdx_sintetico
@@ -433,10 +434,11 @@ def prueba_un_formato_permitido_que_mod_03_no_sabe_revisar_se_rechaza() -> None:
 @pytest.mark.parametrize(
     ("caso", "contenido"),
     [
-        ("texto en vez de números", "onda,intensidad\n400.0,0.80\n"),
         ("una sola columna", "400.0\n500.0\n600.0\n"),
         ("tres columnas", "400.0,0.80,extra\n500.0,0.75,extra\n"),
-        ("separado con punto y coma", "400.0;0.80\n500.0;0.75\n"),
+        ("dos filas seguidas sin números", "onda,intensidad\nvacio,vacio\n"),
+        ("separadores mezclados", "400.0,0.80\n500.0;0.75\n600.0,0.70\n"),
+        ("título suelto en la primera fila", "espectro de acetona\n400.0,0.80\n"),
         ("columna vacía", "400.0,\n500.0,\n"),
         ("solo comas", ",\n,\n"),
     ],
@@ -464,16 +466,103 @@ def prueba_el_csv_acepta_notacion_cientifica() -> None:
 def prueba_el_csv_con_coma_decimal_pasa_t04_y_lo_atrapa_t05() -> None:
     """Límite conocido, anotado a propósito (SUPUESTO para el equipo).
 
-    Excel en español exporta «400,0» con coma decimal. Esa línea trae dos
-    campos numéricos, así que es indistinguible de un par de enteros: MOD-03 no
-    puede rechazarla por estructura sin inventar una regla. Pasa T-04 y la
-    atrapa T-05, porque los números de onda que salen (400, 500…) no cubren el
-    rango requerido. Si el equipo quiere un rechazo temprano y con su propio
-    mensaje, es una decisión de alcance, no algo que yo deba meter aquí.
+    El caso de Excel en español —punto y coma de separador y coma decimal— ya
+    se lee bien desde que se cumplió §6.1. Lo que queda ambiguo es un archivo
+    con **coma de separador** y coma decimal: «400,0» trae dos campos
+    numéricos, así que es indistinguible de un par de enteros y MOD-03 no puede
+    rechazarlo sin inventar una regla. Pasa T-04 y lo atrapa T-05, porque los
+    números de onda que salen (400, 500…) no cubren el rango requerido.
     """
     veredicto = validar("espectro.csv", "400,0\n500,0\n600,0\n")
 
     assert veredicto.valido
+
+
+# --------------------------------------------------------------------------- #
+# Capa 2 · lo que Requerimientos §6.1 admite en un `.csv`
+# --------------------------------------------------------------------------- #
+
+
+def prueba_el_csv_acepta_una_fila_de_encabezado() -> None:
+    """§6.1 admite encabezado, así que rechazarlo era un incumplimiento."""
+    veredicto = validar("espectro.csv", "numero_de_onda,transmitancia\n" + CSV_VALIDO)
+
+    assert veredicto.valido, veredicto.detalle
+
+
+def prueba_el_csv_acepta_el_separador_de_punto_y_coma() -> None:
+    veredicto = validar("espectro.csv", "400.0;0.80\n500.0;0.75\n600.0;0.70\n")
+
+    assert veredicto.valido, veredicto.detalle
+
+
+def prueba_el_csv_de_excel_en_espanol_se_acepta() -> None:
+    """Punto y coma de separador **y** coma decimal: así exporta Excel aquí."""
+    veredicto = validar("espectro.csv", "400,0;0,805\n500,0;0,750\n600,0;0,700\n")
+
+    assert veredicto.valido, veredicto.detalle
+
+
+def prueba_el_csv_acepta_encabezado_con_punto_y_coma() -> None:
+    """Las dos cosas de §6.1 juntas, que es como llegan los archivos reales."""
+    veredicto = validar(
+        "espectro.csv", "numero de onda;transmitancia\n400,0;0,805\n500,0;0,750\n"
+    )
+
+    assert veredicto.valido, veredicto.detalle
+
+
+def prueba_solo_se_perdona_una_fila_de_encabezado() -> None:
+    """Dos filas sin números seguidas ya no son un encabezado."""
+    veredicto = validar(
+        "espectro.csv", "onda,intensidad\nunidades,porcentaje\n" + CSV_VALIDO
+    )
+
+    assert not veredicto.valido
+    assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA
+
+
+def prueba_un_archivo_con_solo_encabezado_no_trae_datos() -> None:
+    veredicto = validar("espectro.csv", "numero_de_onda,transmitancia\n")
+
+    assert not veredicto.valido
+    assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA
+    assert veredicto.capa == CAPA_ESTRUCTURA
+
+
+def prueba_con_coma_de_separador_el_decimal_es_el_punto() -> None:
+    """`400,0,0,805` son cuatro campos, no dos: el archivo no tiene esta forma."""
+    veredicto = validar("espectro.csv", "400,0,0,805\n500,0,0,750\n")
+
+    assert not veredicto.valido
+    assert veredicto.codigo == mensajes.ESTRUCTURA_INVALIDA
+
+
+@pytest.mark.parametrize(
+    ("contenido", "esperado"),
+    [
+        ("400.0,0.80\n", ","),
+        ("400.0;0.80\n", ";"),
+        ("400,0;0,80\n", ";"),
+        ("onda,intensidad\n400.0,0.80\n", ","),
+        ("onda;intensidad\n400,0;0,80\n", ";"),
+        ("no hay separador\n", ","),
+    ],
+)
+def prueba_separador_de(contenido: str, esperado: str) -> None:
+    """Gana el separador que parta la primera fila con contenido en dos columnas."""
+    assert separador_de(contenido) == esperado
+
+
+@pytest.mark.parametrize(
+    "archivo", ["espectro-con-encabezado.csv", "espectro-punto-y-coma.csv"]
+)
+def prueba_los_fixtures_de_la_seccion_6_1_pasan(
+    carpeta_fixtures: Path, archivo: str
+) -> None:
+    veredicto = validar(archivo, _texto(carpeta_fixtures / archivo))
+
+    assert veredicto.valido, veredicto.detalle
 
 
 # --------------------------------------------------------------------------- #
