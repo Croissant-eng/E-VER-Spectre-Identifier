@@ -272,10 +272,9 @@ def prueba_ningun_modulo_repite_los_valores_de_ut03() -> None:
             continue
         texto = archivo.read_text(encoding="utf-8")
         for numero, linea in enumerate(texto.splitlines(), start=1):
-            for patron in VALORES_PROHIBIDOS:
-                if re.search(patron, linea):
-                    relativa = archivo.relative_to(RAIZ).as_posix()
-                    hallazgos.append(f"{relativa}:{numero}: {linea.strip()}")
+            if any(re.search(patron, linea) for patron in VALORES_PROHIBIDOS):
+                relativa = archivo.relative_to(RAIZ).as_posix()
+                hallazgos.append(f"{relativa}:{numero}: {linea.strip()}")
 
     assert not hallazgos, (
         "estos valores deben leerse de UT-03, no escribirse en el código:\n"
