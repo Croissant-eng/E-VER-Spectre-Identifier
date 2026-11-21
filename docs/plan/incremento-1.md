@@ -25,7 +25,8 @@ Resumen operativo para la implementación. **Fuentes (única verdad):** Requerim
 | D-0 | **Solo `.jdx` y `.csv`.** `.dx` queda fuera del incremento (comparte formato con `.jdx`, se puede sumar después sin costo). | La lista de formatos vive en UT-03; el mensaje de rechazo se construye desde esa lista. Ya corregidos §6.1 y CA-01.3 en Requerimientos V3.1 y la tabla del Paso 6 del Plan. *Pendiente documental: §2 (flujo de uso), §4 (alcance, punto 1), **RF-01** y la fila RF-01 de la matriz §11.1 todavía nombran `.dx`; RF-01 es el que urge, porque hoy contradice a su propio CA-01.3. El glosario §6.3 sí debe conservar `.dx`: ahí define el formato JCAMP-DX en general.* |
 | D-4 | **Botón «Analizar»:** al aceptar el archivo, la interfaz muestra que el documento fue aprobado y que «Analizar» está habilitado. **Presente y habilitado, sin acción** (RF-04 es del incremento 3). | CA-01.1 queda verificable: se comprueba el estado del botón, no que analice. |
 | D-5 | **Contrato HTTP:** `POST /api/validar` (sección 5). | MOD-01 nunca llama a MOD-02/MOD-03 directamente; pasa por `backend/api/`. |
-| D-6 | **El archivo de configuración ya está creado** (`backend/utilerias/configuracion/`, nombre tal como está en el repo). | T-01 **no lo crea: lo pone a trabajar.** Debe comprobar que UT-03 lo lee de verdad en ejecución y que el archivo que carga el código es el mismo que está en el repo. Si conserva el sufijo `.ejemplo`, que sea porque **ese** es el archivo que se carga, no una plantilla muerta junto a otra real. |
+| D-6 | **Archivo de configuración: `parametros.json`, versionado.** Se renombra `parametros.ejemplo.json` → `parametros.json`. | El sufijo `.ejemplo` es convención de «plantilla para copiar» (como `.env.ejemplo`) y aquí engañaba: este archivo **es** la fuente operativa, no una plantilla. Sin variante `.ejemplo`. Va commiteado y `.gitignore` **no** debe ignorarlo (la antideriva depende de que esté versionado). Conservar la prueba que falla si aparece un segundo `parametros*.json`. `cargador.py` lee `parametros.json`. |
+| D-7 | **Carpetas de paquetes Python del backend usan guion bajo, no guion.** `manejador-archivos` → `manejador_archivos`; en inc. 3, `motor-identificacion` → `motor_identificacion`. | Un guion no es identificador válido de Python: `import` sobre esa carpeta es error de sintaxis. Aplica **solo a carpetas que Python importa como paquete**. Las del frontend (`interfaz/`, `servicios/`, `visor-espectro/`) conservan el guion. Desviación justificada del Diseño Modular §10, permitida por su propia nota («los nombres anticipan los módulos») y por el checklist del Paso 9; se registra en la bitácora, no es cambio de arquitectura. |
 
 ## 2. Datos y persistencia (Paso 5 + Persistencia v2.0)
 
@@ -91,10 +92,11 @@ Ya creada conforme al Diseño Modular v2.0 §10. Carpetas de este incremento:
 | `frontend/interfaz/` | MOD-01 · flujo y mensajes |
 | `frontend/servicios/` | llamada a `/api/validar` |
 | `backend/api/` | orquestación y límites |
-| `backend/manejador-archivos/` | MOD-02 |
+| `backend/manejador_archivos/` | MOD-02 (guion bajo, D-7) |
 | `backend/validacion/` | MOD-03 |
 | `backend/utilerias/configuracion/` | UT-03 · archivo de parámetros (ya creado) |
 | `backend/utilerias/mensajes/` | UT-02 |
+| `backend/nucleo/` | infraestructura base: arranque de la app, logging, utilidades compartidas. Está en Diseño Modular §10; no es un MOD numerado ni tiene CA. En inc. 1 puede alojar el logging que pide T-03 o quedar mínimo. |
 | `backend/pruebas/` | RNF-06 |
 | `datos/referencia/` | espectros de prueba (NO datos de usuario) |
 
@@ -114,7 +116,7 @@ Ya creada conforme al Diseño Modular v2.0 §10. Carpetas de este incremento:
 | 6 | T-06 MOD-01 (∥ T-03/04/05) | **T-02** (con veredictos simulados) | M | Tú (impl.) · rev. compañero |
 | 7 | T-07 integración E2E | T-03 + T-05 + T-06 | M | Tú (impl.) · compañero: pruebas/evidencia |
 
-> **T-0R va en paralelo desde el día uno** y debe estar cerrada **antes de T-04** (riesgo del Paso 8): sin espectros reales, T-04 y T-07 se prueban contra archivos inventados y las pruebas no dicen nada.
+> **Los fixtures fabricados deben estar antes de T-03**, no antes de T-04 como sugiere el riesgo del Paso 8: CA-01.2, CA-02.2 y las tres de RNF-09 ya son de T-03 y necesitan los archivos de 5 MB y ~3 MB. Son **sintéticos** (sección 11), así que Claude Code los genera en el segundo prompt, antes de arrancar T-03.
 
 > **T-04 y T-06 dependen de T-02:** ni el validador ni la interfaz pueden emitir un rechazo sin el catálogo de mensajes. Si se escriben antes, los textos terminan quemados en el código y hay que refactorizar.
 
@@ -128,11 +130,11 @@ Cada tarea termina cuando pasan las pruebas que se nombran en ella (detalle en l
 - **Objetivo:** confirmar el árbol de la sección 6 antes de codificar (primer riesgo del Paso 8).
 - **Terminado:** rutas verificadas, `.gitignore` correcto, README con instrucciones de arranque.
 
-### T-0R · Conjunto de prueba real — `datos/referencia/`
-- **Objetivo:** conseguir los espectros reales y derivar de ellos los casos límite y de error (sección 11). Es trabajo de datos, no de código, así que corre en paralelo a todo.
-- **De dónde:** **NIST Chemistry WebBook** (`webbook.nist.gov`), gratuito y ya nombrado en los documentos. Se busca el compuesto por nombre o número CAS, se entra a su página de especie y se abre **«IR Spectrum»**; ahí está la descarga en formato JCAMP-DX. Identificadores de los dos espectros de referencia que piden CA-05.1 y CA-05.2: **acetona = `C67641`** (CAS 67-64-1) y **ácido benzoico = `C65850`** (CAS 65-85-0). SDBS (`sdbs.db.aist.go.jp`) no hace falta en este incremento: no publica URL por espectro y conviene reservarlo para el dataset del incremento 3.
-- **Estado:** los tres espectros reales **ya están descargados y verificados** (registro en la sección 11). Falta derivar de ellos los seis archivos restantes; esa parte sí la puede hacer Claude Code, son transformaciones mecánicas.
-- **Terminado:** los nueve archivos de la sección 11 están en `datos/referencia/`, cada uno con una nota de qué CA cubre y de dónde salió; revisados los términos de uso antes de versionarlos.
+### T-0R · Datos de prueba — `datos/pruebas/` (fabricado) y `datos/referencia/` (real)
+- **Objetivo:** dejar listos los dos conjuntos de datos. Es trabajo de datos, no de código, y corre en paralelo a todo.
+- **Fixtures fabricados — los que usan las pruebas del incremento 1:** archivos estructuralmente válidos **sin contenido de NIST**, porque el incremento 1 solo valida estructura, tamaño, puntos y rango. Los genera Claude Code (segundo prompt) y van commiteados en `datos/pruebas/`; los pesados (5 MB, ~3 MB) se generan en el arranque de las pruebas, no al repo (sección 11).
+- **Espectros reales — para el incremento 2 en adelante:** **NIST Chemistry WebBook** (`webbook.nist.gov`). Identificadores: acetona `C67641`, ácido benzoico `C65850`, anilina `C62533`. **Ya descargados y verificados** (sección 11). Son de Coblentz, con copyright: en el repo público **no se versionan** — `datos/referencia/` va en `.gitignore` y se commitea un **script de descarga + manifiesto** que los reproduce (ver «Licencias»). SDBS no hace falta aquí; se reserva para el dataset del incremento 3.
+- **Terminado:** `datos/pruebas/` commiteado con los fixtures y sus notas de CA; `datos/referencia/` en `.gitignore` con el script + manifiesto commiteados; las pruebas de T-03 corren sin descargar nada.
 
 ### T-01 · UT-03 Configuración — `backend/utilerias/configuracion/`
 - **Objetivo:** que el archivo ya creado sea la **única fuente operativa** de los parámetros (sección 3). La tarea no es escribir el archivo, es conectarlo.
@@ -145,7 +147,7 @@ Cada tarea termina cuando pasan las pruebas que se nombran en ella (detalle en l
 - **Terminado:** cada código devuelve título, texto y acción; el mensaje de formato se arma desde la lista de UT-03, no escrito a mano.
 - **Pruebas:** unitarias de catálogo (código → mensaje esperado).
 
-### T-03 · MOD-02 Manejador de archivos — `backend/manejador-archivos/`
+### T-03 · MOD-02 Manejador de archivos — `backend/manejador_archivos/`
 - **Objetivo:** recibir, aplicar el tamaño, leer como texto y descartar.
 - Leer **por bloques** contando bytes; al pasar el límite de UT-03, cortar y rechazar **sin leer el resto**. No confiar en el tamaño que declara el navegador.
 - Contenido **solo en memoria**; nunca escribir el archivo en disco.
@@ -203,23 +205,23 @@ Cada tarea termina cuando pasan las pruebas que se nombran en ella (detalle en l
 | RNF-09 | Error | Error simulado a mitad de la lectura (mock) | Mensaje claro (UT-02) y el temporal **también** se elimina | Unitaria con mock | T-03 | Registro + listado del directorio |
 | RNF-09 | Límite | 5 MB + 1 byte que declara un tamaño menor | Rechaza al pasar el límite, sin leer el resto y sin dejar temporal | Unitaria (MOD-02) | T-03 | Resultado + listado del directorio |
 
-## 11. Archivos de prueba a preparar antes de T-04 y T-07
+## 11. Archivos de prueba a preparar antes de T-03
 
-Riesgo del Paso 8: «falta de espectros `.jdx`/`.csv` reales». **Se parte de espectros reales descargados de NIST o SDBS** y de ellos se derivan los casos límite y de error; solo se fabrica lo que no puede existir en la naturaleza (un tamaño al byte exacto, un archivo truncado, un binario disfrazado). Trabajar con archivos inventados de principio a fin haría que las pruebas pasen sin demostrar nada: los `.jdx` reales de NIST traen datos comprimidos y factores de escala que un archivo hecho a mano no tiene.
+El incremento 1 **solo valida estructura, tamaño, puntos y rango** — nunca mira química real. Por eso sus fixtures son **fabricados**: archivos estructuralmente válidos (etiquetas correctas, conteo de puntos correcto), **sin contenido de NIST**. Esto cumple todas las CA del incremento, evita el problema de licencia del repo público y deja que el revisor corra las pruebas sin descargar nada.
 
-Van en `datos/referencia/`, cada uno con nota de origen y del CA que cubre (T-0R).
+Van commiteados en `datos/pruebas/`, cada uno con nota del CA que cubre. **Excepción:** los archivos grandes (5 MB, ~3 MB) **no** se commitean —no metan binarios de megabytes al historial de git— sino que se generan en el arranque de las pruebas.
 
-| Archivo | Origen | Para |
+| Archivo (fabricado) | Cómo | Para |
 |---|---|---|
-| `.jdx` válido de ~300 KB | **ya descargado**: `67-64-1-IR.jdx` (acetona) | CA-01.1 |
-| CSV de 2 columnas, 900 puntos, 400–4000 | convertido de uno de los tres `.jdx` reales | CA-02.1 |
-| CSV válido de **exactamente 5 242 880 bytes**, ≥300 puntos, que cubra 1400–3700 | real + relleno de puntos hasta el tamaño exacto | CA-01.2 |
-| Archivo de 5 242 881 bytes | el anterior + 1 byte | CA-02.2 |
-| Espectro recortado a 1500–3700 | recorte de uno real | CA-02.3 |
-| Par de espectros con 299 y 300 puntos | recortes de uno real | CA-02.6 |
-| CSV válido de ~3 MB | real o relleno de uno real | pruebas RNF-09 |
-| Archivo de 0 bytes y `.jdx` truncado (sin `##END=`) | fabricados a partir de uno real | CA-02.4 |
-| Binario renombrado a `.csv`, y un `.png` sin renombrar | fabricados | CA-02.5 y CA-01.3 |
+| `.jdx` válido pequeño | etiquetas mínimas correctas + `##XYDATA=` con puntos sintéticos | CA-01.1 |
+| CSV de 2 columnas, 900 puntos, 400–4000 | números sintéticos | CA-02.1 |
+| CSV de exactamente 5 242 880 bytes, ≥300 puntos, 1400–3700 | sintético; **generado en el arranque de pruebas**, no commiteado | CA-01.2 |
+| Archivo de 5 242 881 bytes | el anterior + 1 byte; generado en pruebas | CA-02.2 |
+| CSV recortado a 1500–3700 | sintético | CA-02.3 |
+| Par de CSV con 299 y 300 puntos | sintético | CA-02.6 |
+| CSV de ~3 MB | sintético; generado en pruebas | RNF-09 |
+| Archivo de 0 bytes y `.jdx` truncado (sin `##END=`) | fabricados | CA-02.4 |
+| Binario renombrado a `.csv`, y un `.png` | fabricados | CA-02.5 y CA-01.3 |
 
 > Conviene bajar el **mismo compuesto en `.jdx` y en `.csv`**: sirve para este incremento y es exactamente lo que pide T-08 en el incremento 2 (que ambos produzcan los mismos pares).
 
@@ -232,13 +234,13 @@ NIST publica espectros en **fase gas** y en **fase condensada** (líquido o sól
 
 Anoten la fase junto al origen de cada archivo. En el incremento 1 no cambia el resultado de ninguna prueba —aquí solo se valida estructura, puntos y rango—, pero estos mismos archivos son los que van a usar en el incremento 3 contra CA-05.1 y CA-05.2, y ahí sí decide.
 
-### Cómo generar el CSV
+### El CSV de un espectro real (para el incremento 2, no para el 1)
 
-Los espectros se bajan en `.jdx`; el `.csv` se obtiene convirtiendo uno de ellos con un **script suelto, fuera de la aplicación**. Interpretar JCAMP-DX y convertirlo a pares de números es trabajo de MOD-04 y pertenece al incremento 2: ese script es una herramienta para preparar fixtures y **no debe quedar dentro del código del incremento 1** ni convertirse después en la base de MOD-04 sin revisarlo.
+Los fixtures del incremento 1 son sintéticos (arriba). Cuando en el incremento 2 haga falta el `.csv` de un espectro **real** —para T-08, que verifica que `.jdx` y `.csv` del mismo compuesto den los mismos pares— se obtiene convirtiendo uno de los `.jdx` descargados con un **script suelto, fuera de la aplicación**. Interpretar JCAMP-DX es trabajo de MOD-04: ese script es solo una herramienta de fixtures y **no debe quedar dentro del código** ni volverse la base de MOD-04 sin revisarlo.
 
 ### Espectros reales ya elegidos (registro de T-0R)
 
-Los tres cubren lo que el incremento necesita; de ellos se derivan los seis archivos restantes. Todos de NIST Chemistry WebBook, en `##YUNITS=TRANSMITTANCE` y con factores de escala en 1.
+Material para el incremento 2 en adelante (no para los fixtures del incremento 1, que son sintéticos). Todos de NIST Chemistry WebBook, Coblentz, en `##YUNITS=TRANSMITTANCE` y con factores de escala en 1. **Los tres llevan copyright de Coblentz**, así que no se commitean en el repo público (ver «Licencias»).
 
 | Archivo | Compuesto | Espectro elegido | Rango · puntos | Por qué |
 |---|---|---|---|---|
@@ -264,18 +266,18 @@ Guardarlos aparte como **casos de error reales**: §6.1 solo admite transmitanci
 
 En cuatro descargas reales aparecieron tres unidades distintas: transmitancia, reflectancia e índice de refracción. §6.1 declara que solo se admiten transmitancia y absorbancia, pero RF-02 no la menciona y ningún CA la cubre. Propuesta a discutir: añadir la lista de unidades admitidas a UT-03 y la verificación a MOD-03, con su propio mensaje en UT-02. **Es un cambio de alcance: requiere aprobación del equipo antes de implementarse, no lo metan por cuenta propia en el incremento 1.**
 
-### Licencias
+### Licencias (repo público)
 
-Las páginas de NIST llevan la nota «Data compilation copyright by the U.S. Secretary of Commerce on behalf of the U.S.A.». Para uso académico no hay problema; revisar antes de versionar los archivos en un repositorio público (riesgo abierto n.º 4 de Requerimientos V3.1).
+Los tres espectros reales son de la **Coblentz Society** y llevan copyright («Collection © copyright by the U.S. Secretary of Commerce… All rights reserved»; el ácido benzoico, «© 1988 by Coblentz Society Inc.»). Usarlos para estudiar es uso académico sin problema; **commitearlos en un repo público es redistribuirlos**, y eso es justo lo que el riesgo abierto n.º 4 de Requerimientos V3.1 manda revisar.
 
-> **Licencias:** antes de versionar espectros de NIST/SDBS, revisar sus términos de uso (riesgo abierto n.º 4 de Requerimientos V3).
+**Decisión del equipo (repo público):** los `.jdx` reales **no se versionan**. `datos/referencia/` queda en `.gitignore`; en su lugar se commitea un **script de descarga + manifiesto** (compuesto, CAS, ID de NIST, espectro elegido) para que cualquiera los reproduzca. Los **fixtures sintéticos** del incremento 1 sí se commitean: no contienen datos de NIST. Esto no es consejo legal, es la vía que evita el problema de redistribución de raíz.
 
 ## 12. Hitos
 
 **H1** cimientos probados en unidad (T-00, T-01, T-02) → **H2** MOD-02 recibe y descarta sin residuos, pruebas RNF-09 en verde (T-03) → **H3** validación completa: CA-01.3 y CA-02.1–02.6 (T-04, T-05) → **H4** la UI muestra el veredicto (T-06) → **H5** flujo de punta a punta: CA-01.1 + CA-02 completo (T-07, incremento demostrable).
 
 > H2 no se cierra hasta que pasen las tres pruebas RNF-09 de T-03.
-> H3 no se abre hasta que T-0R esté cerrada: sin espectros reales no hay con qué probar.
+> H3 necesita los fixtures fabricados listos (sección 11), no los espectros reales: el incremento 1 valida estructura, no química.
 
 ## 13. Qué no cubre este incremento aunque aparezca en «Cubre»
 
