@@ -20,6 +20,10 @@ datos/referencia/*
 motor-identificacion/modelo/*
 !motor-identificacion/modelo/.gitkeep
 
+# UT-03 · el archivo de parametros SI va versionado (D-6): la prueba antideriva
+# y el arranque del backend dependen de que este en el repositorio.
+!backend/utilerias/configuracion/parametros.json
+
 # Nunca subir archivos de usuarios (RNF-09)
 subidas/
 tmp/

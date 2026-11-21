@@ -2,8 +2,9 @@
 
 Este módulo es la **única fuente operativa** de los parámetros del sistema
 (incremento 1, sección 3 del plan). La *regla* vive en Requerimientos V3 §6.1;
-el *valor* vive solo en `parametros.ejemplo.json`. Ningún otro módulo repite
-estos valores: si el archivo cambia, el comportamiento cambia sin tocar código.
+el *valor* vive solo en el archivo que nombra `NOMBRE_ARCHIVO`. Ningún otro
+módulo repite estos valores: si el archivo cambia, el comportamiento cambia sin
+tocar código.
 
 Dos consecuencias de diseño:
 
@@ -27,10 +28,18 @@ from typing import Any
 #: Carpeta de UT-03 dentro del repositorio.
 CARPETA: Path = Path(__file__).resolve().parent
 
-#: Nombre del archivo de parámetros **tal como está en el repositorio** (D-6).
-#: Conserva el sufijo `.ejemplo` porque este es el archivo que el código carga
-#: de verdad, no una plantilla muerta junto a otra real.
-NOMBRE_ARCHIVO: str = "parametros.ejemplo.json"
+#: Nombre del archivo de parámetros (D-6). Va versionado en el repositorio y
+#: **no** lleva sufijo `.ejemplo`: ese sufijo es convención de «plantilla para
+#: copiar» y aquí engañaba, porque este archivo *es* la fuente operativa.
+#:
+#: El nombre vive solo aquí: `cargador.py` y las pruebas lo leen de esta
+#: constante, así un renombre futuro toca una sola línea.
+NOMBRE_ARCHIVO: str = "parametros.json"
+
+#: Patrón para detectar variantes del archivo de parámetros. D-6 exige que haya
+#: exactamente una: si aparece una segunda, alguna deja de ser la fuente y la
+#: decisión hay que volverla a tomar.
+PATRON_ARCHIVO: str = "parametros*.json"
 
 #: Ruta completa del archivo de parámetros.
 RUTA_PARAMETROS: Path = CARPETA / NOMBRE_ARCHIVO

@@ -24,6 +24,7 @@ import pytest
 
 from backend.utilerias.configuracion import (
     NOMBRE_ARCHIVO,
+    PATRON_ARCHIVO,
     RUTA_PARAMETROS,
     ErrorDeConfiguracion,
     cargar,
@@ -57,18 +58,27 @@ def _escribir(carpeta: Path, datos: Any) -> Path:
 
 def prueba_el_archivo_que_carga_el_codigo_es_el_del_repositorio() -> None:
     assert RUTA_PARAMETROS.is_file(), f"no existe {RUTA_PARAMETROS}"
-    assert RUTA_PARAMETROS.name == "parametros.ejemplo.json"
     assert RUTA_PARAMETROS.parent == RAIZ / "backend" / "utilerias" / "configuracion"
+    assert RUTA_PARAMETROS.name == NOMBRE_ARCHIVO
     assert cargar().ruta == RUTA_PARAMETROS
 
 
-def prueba_no_hay_una_plantilla_muerta_junto_a_otra_real() -> None:
-    """D-6: el sufijo `.ejemplo` se conserva porque ESE es el archivo que se
-    carga. Si algún día aparece un segundo `parametros*.json`, uno de los dos
+def prueba_el_archivo_no_es_una_plantilla() -> None:
+    """D-6: el archivo de parámetros no lleva sufijo `.ejemplo`, porque no es una
+    plantilla para copiar: es la fuente operativa y va versionado."""
+    assert ".ejemplo" not in NOMBRE_ARCHIVO, (
+        "D-6 quitó el sufijo «.ejemplo»: este archivo es la fuente, no una "
+        "plantilla"
+    )
+
+
+def prueba_solo_hay_un_archivo_de_parametros() -> None:
+    """D-6: si algún día aparece un segundo `parametros*.json`, uno de los dos
     deja de ser la fuente y la decisión hay que volverla a tomar."""
-    candidatos = sorted(p.name for p in RUTA_PARAMETROS.parent.glob("parametros*.json"))
-    assert candidatos == ["parametros.ejemplo.json"], (
-        "hay más de un archivo de parámetros en UT-03: " f"{candidatos}"
+    candidatos = sorted(p.name for p in RUTA_PARAMETROS.parent.glob(PATRON_ARCHIVO))
+
+    assert candidatos == [NOMBRE_ARCHIVO], (
+        f"UT-03 debería tener un solo archivo de parámetros; hay: {candidatos}"
     )
 
 

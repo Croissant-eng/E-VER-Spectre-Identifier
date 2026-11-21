@@ -77,7 +77,7 @@ pytest backend/pruebas/prueba_ut03_configuracion.py
 
 Todos los parámetros operativos —tamaño máximo, formatos permitidos, puntos mínimos, rango
 requerido y etiquetas JCAMP-DX— viven **únicamente** en
-`backend/utilerias/configuracion/parametros.ejemplo.json`. Ningún módulo repite esos valores:
+`backend/utilerias/configuracion/parametros.json`. Ningún módulo repite esos valores:
 si el archivo cambia, el comportamiento cambia sin tocar código. Si al arrancar falta una llave
 obligatoria, el backend **no arranca** y dice cuál falta.
 

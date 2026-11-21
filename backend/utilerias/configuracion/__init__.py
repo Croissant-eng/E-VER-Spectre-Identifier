@@ -11,6 +11,7 @@
 from backend.utilerias.configuracion.cargador import (
     CARPETA,
     NOMBRE_ARCHIVO,
+    PATRON_ARCHIVO,
     RUTA_PARAMETROS,
     Configuracion,
     ErrorDeConfiguracion,
@@ -24,6 +25,7 @@ from backend.utilerias.configuracion.cargador import (
 __all__ = [
     "CARPETA",
     "NOMBRE_ARCHIVO",
+    "PATRON_ARCHIVO",
     "RUTA_PARAMETROS",
     "Configuracion",
     "ErrorDeConfiguracion",
