@@ -1,0 +1,6 @@
+{
+  "name": "e-ver-frontend",
+  "private": true,
+  "type": "module",
+  "description": "MOD-01 y servicios. Sin dependencias y sin build: type=module solo le dice a Node que los .js son modulos ES, los mismos que el navegador carga con <script type=module>. Las pruebas corren con el corredor que ya trae Node: node --test frontend/pruebas"
+}

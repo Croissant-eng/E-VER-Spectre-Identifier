@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>E-VER · Validar un espectro</title>
+    <!--
+      MOD-01 · interfaz mínima del incremento 1 (T-06).
+
+      HTML/CSS/JS puro, sin framework y sin nada que se descargue de internet:
+      todo lo que la página necesita está en estas tres piezas del repositorio.
+
+      Lo que NO está aquí a propósito: la lista de formatos admitidos, el tamaño
+      máximo y el atributo `accept` del selector. Esos valores son de UT-03
+      (regla 1: nada de parámetros escritos en el código) y el frontend no tiene
+      de dónde leerlos en este incremento. Además, sin `accept` la persona SÍ
+      puede elegir un .png y ver el mensaje de formato, que es justo lo que
+      CA-01.3 necesita probar. Si el equipo quiere filtrar el selector y mostrar
+      los límites, lo limpio es que T-07 sirva esos valores desde UT-03.
+    -->
+    <link rel="stylesheet" href="estilos.css" />
+  </head>
+  <body>
+    <header class="cabecera">
+      <p class="marca">E-VER Spectre Identifier</p>
+      <h1>Validar un espectro infrarrojo</h1>
+      <p class="subtitulo">
+        Suba el archivo de su espectro. La aplicación revisa que sirva para
+        analizarse y le dice qué pasó.
+      </p>
+    </header>
+
+    <main class="contenido">
+      <form class="tarjeta formulario" id="formulario" novalidate>
+        <div class="campo">
+          <label class="etiqueta" for="archivo">Archivo del espectro</label>
+          <input
+            class="archivo"
+            type="file"
+            id="archivo"
+            name="archivo"
+            aria-describedby="ayuda-archivo"
+          />
+          <p class="ayuda" id="ayuda-archivo">
+            El archivo se revisa en el servidor y no se guarda en ninguna parte.
+          </p>
+        </div>
+        <button class="boton boton-principal" type="submit" id="validar" disabled>
+          Validar
+        </button>
+      </form>
+
+      <!--
+        La tarjeta del resultado nace escondida: mientras no haya veredicto no
+        se pinta nada, para que nunca se vea una vista a medias.
+      -->
+      <section
+        class="tarjeta resultado"
+        id="resultado"
+        aria-live="polite"
+        hidden
+      >
+        <h2 class="resultado-titulo" id="resultado-titulo" hidden></h2>
+        <p class="resultado-nombre" id="resultado-nombre" hidden></p>
+        <p class="resultado-mensaje" id="resultado-mensaje" hidden></p>
+        <p class="resultado-accion" id="resultado-accion" hidden></p>
+
+        <div class="bloque-analizar" id="bloque-analizar" hidden>
+          <!--
+            D-4: presente y habilitado cuando el documento se aprueba, y SIN
+            acción. Nadie le pone un manejador de clic, ni aquí ni en el
+            JavaScript: hasta el incremento 3 no hay nada que analizar.
+          -->
+          <button class="boton boton-secundario" type="button" id="analizar">
+            Analizar
+          </button>
+          <p class="nota" id="nota-analizar" hidden></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="pie">
+      <p>
+        Equipo E-VER · Desarrollo de Aplicaciones y Servicios Virtuales ·
+        Universidad Iberoamericana León
+      </p>
+    </footer>
+
+    <script type="module" src="interfaz.js"></script>
+  </body>
+</html>
