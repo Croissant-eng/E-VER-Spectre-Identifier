@@ -1,0 +1,17 @@
+# E-VER Spectre Identifier · dependencias
+#
+# Stack confirmado en CLAUDE.md: Python + FastAPI (backend), HTML/CSS/JS puro
+# (frontend), sin base de datos.
+#
+# Incremento 1 (A) · subir y validar. NO se agregan dependencias de graficas,
+# machine learning ni PDF: esas decisiones son D-1 (incremento 2) y D-3
+# (incremento 5) y todavia no estan tomadas.
+
+# --- Aplicacion ---
+fastapi==0.165.0
+uvicorn==0.54.0
+python-multipart==0.0.34   # requerido por FastAPI para multipart/form-data (POST /api/validar)
+
+# --- Pruebas (RNF-06) ---
+pytest==9.2.0
+httpx==0.28.1              # cliente de pruebas de FastAPI (TestClient), usado a partir de T-07
