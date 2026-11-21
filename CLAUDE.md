@@ -32,7 +32,7 @@ Si algo en el código contradice estos documentos, **detente y pregunta**; no lo
 | ID | Módulo | Carpeta |
 |---|---|---|
 | MOD-01 | Interfaz web | `frontend/interfaz/` |
-| MOD-02 | Manejador de archivos | `backend/manejador-archivos/` |
+| MOD-02 | Manejador de archivos | `backend/manejador_archivos/` |
 | MOD-03 | Validador | `backend/validacion/` |
 | MOD-04 | Procesador de espectros | `backend/preprocesamiento/` |
 | MOD-05 | Visualizador de espectro | `frontend/visor-espectro/` |
@@ -45,6 +45,11 @@ Si algo en el código contradice estos documentos, **detente y pregunta**; no lo
 
 Orquestación HTTP: `backend/api/`. Pruebas del backend: `backend/pruebas/` (archivos de prueba en
 `backend/pruebas/archivos/`).
+
+**Nombres de carpeta (D-7):** las carpetas que Python importa como paquete usan **guion bajo**,
+porque un guion no es identificador válido y `import` sobre ellas es error de sintaxis. Por eso
+`backend/manejador_archivos/`; `motor-identificacion/` se renombra igual al llegar al incremento 3.
+Las carpetas del frontend (`interfaz/`, `servicios/`, `visor-espectro/`) conservan el guion.
 
 ## Reglas que no se rompen
 1. **Parámetros solo desde UT-03.** Nunca escribas en el código 5 MB, 300 puntos, 1400–3700 cm⁻¹,
