@@ -16,8 +16,10 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 BACKEND = RAIZ / "backend"
 
-#: Carpetas que no son paquetes: cachés y archivos de apoyo de las pruebas.
-IGNORADAS = {"__pycache__", ".pytest_cache", "archivos"}
+#: Carpetas que no son paquetes: solo cachés de herramientas. D-8 quitó
+#: `backend/pruebas/archivos/`: los datos de prueba viven en `datos/pruebas/` y
+#: `backend/pruebas/` queda solo para código (RNF-06).
+IGNORADAS = {"__pycache__", ".pytest_cache"}
 
 
 def prueba_las_carpetas_del_backend_son_importables_como_paquete() -> None:
@@ -42,3 +44,36 @@ def prueba_mod_02_vive_en_la_carpeta_con_guion_bajo() -> None:
     assert not (BACKEND / "manejador-archivos").exists(), (
         "quedó la carpeta vieja con guion: el renombre de D-7 está a medias"
     )
+
+
+def prueba_las_pruebas_solo_guardan_codigo() -> None:
+    """D-8: `backend/pruebas/` es código; los datos de prueba viven en `datos/`.
+
+    Tener dos lugares para lo mismo invita a que alguien commitee ahí un
+    espectro —o un archivo de megabytes— y la sección 11 del plan dice justo lo
+    contrario.
+    """
+    assert not (BACKEND / "pruebas" / "archivos").exists(), (
+        "D-8 quitó backend/pruebas/archivos/: los archivos de prueba van en "
+        "datos/pruebas/"
+    )
+
+    intrusos = [
+        p.relative_to(RAIZ).as_posix()
+        for p in (BACKEND / "pruebas").rglob("*")
+        if p.is_file()
+        and p.suffix != ".py"
+        and "__pycache__" not in p.relative_to(RAIZ).parts
+    ]
+
+    assert not intrusos, (
+        "estos archivos no son código y no deberían vivir en backend/pruebas/; "
+        f"su lugar es datos/pruebas/: {intrusos}"
+    )
+
+
+def prueba_los_datos_de_prueba_viven_en_datos() -> None:
+    """La otra mitad de D-8: la carpeta de fixtures existe y está poblada."""
+    carpeta = RAIZ / "datos" / "pruebas"
+    assert carpeta.is_dir(), f"faltan los archivos de prueba en {carpeta}"
+    assert any(carpeta.iterdir()), f"{carpeta} está vacía"

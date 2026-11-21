@@ -43,8 +43,11 @@ Si algo en el código contradice estos documentos, **detente y pregunta**; no lo
 | UT-02 | Errores y mensajes | `backend/utilerias/mensajes/` |
 | UT-03 | Configuración | `backend/utilerias/configuracion/` |
 
-Orquestación HTTP: `backend/api/`. Pruebas del backend: `backend/pruebas/` (archivos de prueba en
-`backend/pruebas/archivos/`).
+Orquestación HTTP: `backend/api/`. Infraestructura base (arranque, logging): `backend/nucleo/`.
+Pruebas del backend: `backend/pruebas/`, **solo código** (RNF-06). Los **datos** de prueba viven en
+`datos/pruebas/` (fixtures fabricados, versionados) y `datos/referencia/` (espectros reales, fuera
+del repositorio); los pesados los genera `backend/pruebas/conftest.py` al arrancar las pruebas y
+nunca se commitean (D-8).
 
 **Nombres de carpeta (D-7):** las carpetas que Python importa como paquete usan **guion bajo**,
 porque un guion no es identificador válido y `import` sobre ellas es error de sintaxis. Por eso
