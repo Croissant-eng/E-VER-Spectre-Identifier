@@ -1,0 +1,9 @@
+# Los espectros y los archivos de prueba se guardan byte a byte: su tamano y su
+# conteo de puntos son parte de las pruebas (CA-01.2 pide 5 242 880 bytes
+# exactos y CA-02.2 uno mas). Si git les convierte los saltos de linea al
+# clonar en Windows, cambian los bytes y las pruebas dejan de medir lo que
+# dicen medir.
+*.jdx   -text
+*.csv   -text
+*.png   binary
+datos/pruebas/** -text
