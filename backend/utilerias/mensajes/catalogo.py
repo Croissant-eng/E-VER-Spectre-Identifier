@@ -12,7 +12,9 @@ sube el tamaño máximo, el mensaje lo dice sin tocar una línea de código.
 
 Los otros cuatro códigos cubren las situaciones que sí necesitan *algún*
 mensaje, aunque su redacción sea libre: archivo que no es texto, estructura
-inválida, configuración incompleta al arrancar y lectura interrumpida.
+inválida, configuración incompleta al arrancar y lectura interrumpida. El
+noveno, `FALLO_INTERNO`, es el **mensaje genérico** que la sección 5 deja
+pendiente para el 500 del endpoint (T-07).
 
 El catálogo se completa conforme aparezcan más situaciones; hoy no se inventan
 códigos que ninguna tarea del incremento 1 use todavía.
@@ -53,6 +55,12 @@ CONFIGURACION_INCOMPLETA = "CONFIGURACION_INCOMPLETA"
 
 #: La lectura del archivo se interrumpió antes de terminar (pruebas RNF-09).
 LECTURA_INTERRUMPIDA = "LECTURA_INTERRUMPIDA"
+
+#: Algo falló por dentro y no se pudo emitir veredicto. Es el **mensaje
+#: genérico** que la sección 5 del plan deja pendiente para el 500 de
+#: `POST /api/validar` (T-07): dice qué pasó y qué hacer, y nunca por qué, que
+#: es justo lo que no debe salir del servidor.
+FALLO_INTERNO = "FALLO_INTERNO"
 
 
 class CodigoDesconocido(Exception):
@@ -192,6 +200,20 @@ _CATALOGO: dict[str, _Entrada] = {
             "no se pudo revisar el espectro."
         ),
         accion=lambda c: "Vuelva a subir el archivo.",
+    ),
+    # El genérico de la sección 5: sirve para cualquier fallo interno, así que
+    # no nombra ninguna causa. Si nombrara una, estaría contando por dentro qué
+    # se rompió, que es exactamente lo que no debe salir.
+    FALLO_INTERNO: _Entrada(
+        titulo="No se pudo revisar el archivo",
+        texto=lambda c: (
+            "Ocurrió un problema al revisar el archivo y no se pudo entregar "
+            "un resultado."
+        ),
+        accion=lambda c: (
+            "Vuelva a intentarlo en un momento; si sigue ocurriendo, avise al "
+            "equipo del proyecto."
+        ),
     ),
 }
 

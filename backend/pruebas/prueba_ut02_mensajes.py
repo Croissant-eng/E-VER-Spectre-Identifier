@@ -148,10 +148,12 @@ CODIGOS_ESPERADOS = (
     mensajes.ESTRUCTURA_INVALIDA,
     mensajes.CONFIGURACION_INCOMPLETA,
     mensajes.LECTURA_INTERRUMPIDA,
+    # El genérico del 500, que la sección 5 dejaba pendiente (T-07).
+    mensajes.FALLO_INTERNO,
 )
 
 
-def prueba_el_catalogo_cubre_las_ocho_situaciones_de_la_seccion_4() -> None:
+def prueba_el_catalogo_cubre_las_situaciones_de_la_seccion_4_y_del_contrato() -> None:
     assert set(mensajes.codigos()) == set(CODIGOS_ESPERADOS)
 
 

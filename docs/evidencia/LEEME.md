@@ -5,7 +5,8 @@ Capturas que pide el plan del incremento 1 como evidencia de las tareas.
 Se regeneran desde la raíz del repositorio con:
 
 ```bash
-python -m herramientas.capturar_interfaz
+python -m herramientas.capturar_interfaz   # T-06 · veredictos simulados
+python -m herramientas.capturar_ca_01_1    # T-07 · contra el servidor real
 ```
 
 ## T-06 · MOD-01 interfaz mínima
@@ -39,3 +40,33 @@ sistema.
 El texto del rechazo de las capturas no está escrito en la herramienta: se pide
 al catálogo de UT-02, así que si el equipo cambia la redacción, la siguiente
 captura sale con el texto nuevo.
+
+## T-07 · integración, de punta a punta (CA-01.1)
+
+| Captura | Qué muestra |
+|---|---|
+| `t-07-escritorio-ca-01-1.png` | CA-01.1 completo: se subió el `.jdx` fabricado, el servidor respondió y la pantalla muestra el **nombre del archivo**, **«Documento aprobado»** y **«Analizar» habilitado** |
+| `t-07-movil-360-ca-01-1.png` | Lo mismo, a 360 px de ancho, con la medición al pie |
+
+**Qué las diferencia de las de T-06.** Aquí no hay **nada** simulado. La
+herramienta levanta la aplicación real con `uvicorn`, el navegador abre la
+página que sirve esa aplicación y sube el espectro por `POST /api/validar`: el
+veredicto que se ve en la imagen lo escribió el servidor después de pasar por
+MOD-02 y MOD-03. En T-06 el veredicto venía escrito en un archivo de
+simulación, porque el endpoint todavía no existía.
+
+**El único añadido** es un archivo que elige el espectro y envía el formulario
+solo, porque el navegador en modo headless no tiene a nadie que haga clic. Vive
+en la copia temporal, igual que en T-06: los archivos del repositorio no llevan
+ganchos de prueba.
+
+**No se guarda una captura que no demuestre nada.** Antes de fotografiar, la
+herramienta lee el DOM y exige encontrar el nombre del archivo, el estado
+«aceptado» y el botón «Analizar» habilitado. Si el veredicto no llegó, falla en
+vez de dejar una imagen vacía. Lo mismo con el ancho: si la medición dijera
+`desborda=si`, aborta.
+
+El archivo que se sube es el `.jdx` **fabricado** de `datos/pruebas/`, para que
+cualquiera pueda repetir la captura sin descargar nada (sección 11 del plan). El
+espectro real de acetona sirve igual si el equipo quiere una captura con datos
+de verdad para la demostración.

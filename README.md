@@ -11,7 +11,7 @@ motor híbrido (reglas + IA), resalta los picos con una explicación y genera un
 ## Estado
 | Incremento | Contenido | Estado |
 |---|---|---|
-| 1 (A) | Subir y validar | En curso |
+| 1 (A) | Subir y validar | Completo |
 | 2 (B) | Procesar y ver el espectro | Pendiente |
 | 3 (C) | Identificar grupos funcionales | Pendiente |
 | 4 (D) | Capa educativa | Pendiente |
@@ -47,21 +47,25 @@ source .venv/bin/activate      # macOS / Linux
 pip install -r requirements.txt
 ```
 
-### Backend
+### Levantar la aplicación
 
 ```bash
-uvicorn backend.api.aplicacion:app --reload --port 8000
+uvicorn backend.api:crear_aplicacion --factory --reload --port 8000
 ```
 
-> El punto de entrada `backend/api/aplicacion.py` queda disponible al cerrar **T-07**
-> (integración de punta a punta). Hasta entonces el backend no se levanta todavía: lo que
-> sí se puede ejecutar son las pruebas.
+Y abrir **http://127.0.0.1:8000/**. Eso es todo: el mismo servidor sirve la interfaz y
+atiende `POST /api/validar`, así que la página y el endpoint son del **mismo origen** y no
+hace falta configurar nada más.
+
+> Es `--factory` porque `backend/api` no expone una aplicación ya creada: crearla lee la
+> configuración de UT-03, y eso no debe ocurrir por el solo hecho de importar el módulo. Si
+> falta una llave obligatoria, **no arranca** y dice cuál falta.
 
 ### Frontend
 
-`frontend/interfaz/index.html` se abre directo en el navegador (HTML/CSS/JS puro, sin
-compilación ni servidor de desarrollo). Llega con **T-06**; necesita el backend arriba para
-que la validación responda de verdad.
+No se abre `frontend/interfaz/index.html` con doble clic: el navegador no carga módulos de
+JavaScript desde un archivo suelto y la llamada al servidor no tendría a quién preguntarle.
+Se abre siempre por el servidor, en `http://127.0.0.1:8000/`.
 
 ### Pruebas
 
@@ -69,10 +73,15 @@ que la validación responda de verdad.
 pytest
 ```
 
-Lee `pytest.ini`: colecta `backend/pruebas/prueba_*.py`. Para una sola tarea:
+Un solo comando para todo: `pytest.ini` colecta `backend/pruebas/prueba_*.py` y esas
+pruebas lanzan además las de JavaScript (`frontend/pruebas/*.test.js`) con `node --test`, el
+corredor que ya viene dentro de Node —sin instalar nada ni compilar—. Si no hay Node
+instalado, esas se saltan con un mensaje claro en vez de fallar.
+
+Para una sola tarea:
 
 ```bash
-pytest backend/pruebas/prueba_ut03_configuracion.py
+pytest backend/pruebas/prueba_t07_integracion.py
 ```
 
 ## Configuración (UT-03)
