@@ -44,10 +44,13 @@ Si algo en el código contradice estos documentos, **detente y pregunta**; no lo
 | UT-03 | Configuración | `backend/utilerias/configuracion/` |
 
 Orquestación HTTP: `backend/api/`. Infraestructura base (arranque, logging): `backend/nucleo/`.
-Pruebas del backend: `backend/pruebas/`, **solo código** (RNF-06). Los **datos** de prueba viven en
-`datos/pruebas/` (fixtures fabricados, versionados) y `datos/referencia/` (espectros reales, fuera
-del repositorio); los pesados los genera `backend/pruebas/conftest.py` al arrancar las pruebas y
-nunca se commitean (D-8).
+
+**Dónde van las pruebas (RNF-06, D-8, D-9):** `backend/pruebas/` guarda las de Python y **solo
+código**; `frontend/pruebas/` guarda las de JavaScript, que corren con `node --test` —el corredor
+que ya trae Node, sin instalar nada ni compilar— y las lanza `pytest` para que el equipo siga
+teniendo un solo comando (D-9). Los **datos** de prueba viven en `datos/pruebas/` (fixtures
+fabricados, versionados) y `datos/referencia/` (espectros reales, fuera del repositorio); los
+pesados los genera `backend/pruebas/conftest.py` al arrancar las pruebas y nunca se commitean (D-8).
 
 **Nombres de carpeta (D-7):** las carpetas que Python importa como paquete usan **guion bajo**,
 porque un guion no es identificador válido y `import` sobre ellas es error de sintaxis. Por eso
