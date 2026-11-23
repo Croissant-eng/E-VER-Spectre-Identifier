@@ -11,6 +11,7 @@ Uso habitual:
 from backend.utilerias.mensajes.catalogo import (
     ARCHIVO_NO_ES_TEXTO,
     CONFIGURACION_INCOMPLETA,
+    DATOS_ILEGIBLES,
     ESTRUCTURA_INVALIDA,
     FALLO_INTERNO,
     FORMATO_NO_SOPORTADO,
@@ -27,6 +28,7 @@ from backend.utilerias.mensajes.catalogo import (
 __all__ = [
     "ARCHIVO_NO_ES_TEXTO",
     "CONFIGURACION_INCOMPLETA",
+    "DATOS_ILEGIBLES",
     "ESTRUCTURA_INVALIDA",
     "FALLO_INTERNO",
     "FORMATO_NO_SOPORTADO",

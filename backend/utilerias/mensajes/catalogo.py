@@ -62,6 +62,11 @@ LECTURA_INTERRUMPIDA = "LECTURA_INTERRUMPIDA"
 #: es justo lo que no debe salir del servidor.
 FALLO_INTERNO = "FALLO_INTERNO"
 
+#: El archivo pasó la validación, pero sus datos no se pudieron leer con
+#: seguridad en MOD-04: compresión que no se reconoce, unidades que no son las
+#: de un espectro infrarrojo o un número de puntos que no cuadra (T-08).
+DATOS_ILEGIBLES = "DATOS_ILEGIBLES"
+
 
 class CodigoDesconocido(Exception):
     """Se pidió un código que no está en el catálogo.
@@ -213,6 +218,18 @@ _CATALOGO: dict[str, _Entrada] = {
         accion=lambda c: (
             "Vuelva a intentarlo en un momento; si sigue ocurriendo, avise al "
             "equipo del proyecto."
+        ),
+    ),
+    # Incremento 2, lectura completa en MOD-04 (T-08).
+    DATOS_ILEGIBLES: _Entrada(
+        titulo="No se pudieron leer los datos del espectro",
+        texto=lambda c: (
+            "El archivo tiene la estructura correcta, pero sus datos vienen en "
+            "una forma o en unas unidades que la aplicación no reconoce."
+        ),
+        accion=lambda c: (
+            "Exporte el espectro otra vez, en número de onda y con la "
+            "intensidad en transmitancia o absorbancia, y vuelva a subirlo."
         ),
     ),
 }
