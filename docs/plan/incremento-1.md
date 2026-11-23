@@ -28,6 +28,7 @@ Resumen operativo para la implementación. **Fuentes (única verdad):** Requerim
 | D-6 | **Archivo de configuración: `parametros.json`, versionado.** Se renombra `parametros.ejemplo.json` → `parametros.json`. | El sufijo `.ejemplo` es convención de «plantilla para copiar» (como `.env.ejemplo`) y aquí engañaba: este archivo **es** la fuente operativa, no una plantilla. Sin variante `.ejemplo`. Va commiteado y `.gitignore` **no** debe ignorarlo (la antideriva depende de que esté versionado). Conservar la prueba que falla si aparece un segundo `parametros*.json`. `cargador.py` lee `parametros.json`. |
 | D-7 | **Carpetas de paquetes Python del backend usan guion bajo, no guion.** `manejador-archivos` → `manejador_archivos`; en inc. 3, `motor-identificacion` → `motor_identificacion`. | Un guion no es identificador válido de Python: `import` sobre esa carpeta es error de sintaxis. Aplica **solo a carpetas que Python importa como paquete**. Las del frontend (`interfaz/`, `servicios/`, `visor-espectro/`) conservan el guion. Desviación justificada del Diseño Modular §10, permitida por su propia nota («los nombres anticipan los módulos») y por el checklist del Paso 9; se registra en la bitácora, no es cambio de arquitectura. |
 | D-8 | **Datos de prueba fabricados en `datos/pruebas/` (commiteados); `backend/pruebas/` solo código (RNF-06).** | Coherente con Diseño Modular §10 (`datos/` es el hogar de datos estáticos) y deja `datos/pruebas/` junto a `datos/referencia/`. Se elimina la carpeta vacía `backend/pruebas/archivos/` y se alinea esa fila de `CLAUDE.md`. |
+| D-9 | **`frontend/pruebas/` es carpeta nueva, para las pruebas JS (`node --test`).** | Única adición a la estructura del Diseño Modular §10, justificada: `backend/pruebas/` quedó solo para Python (D-8) y las pruebas de MOD-01 necesitan hogar propio, en paralelo. Se registra en la bitácora y en `CLAUDE.md`; amendar §10 del PDF queda a criterio del equipo. |
 
 ## 2. Datos y persistencia (Paso 5 + Persistencia v2.0)
 
@@ -92,6 +93,7 @@ Ya creada conforme al Diseño Modular v2.0 §10. Carpetas de este incremento:
 |---|---|
 | `frontend/interfaz/` | MOD-01 · flujo y mensajes |
 | `frontend/servicios/` | llamada a `/api/validar` |
+| `frontend/pruebas/` | pruebas JS de MOD-01 (`node --test`) (D-9) |
 | `backend/api/` | orquestación y límites |
 | `backend/manejador_archivos/` | MOD-02 (guion bajo, D-7) |
 | `backend/validacion/` | MOD-03 |
@@ -182,8 +184,14 @@ Cada tarea termina cuando pasan las pruebas que se nombran en ella (detalle en l
 - **Pruebas:** vista correcta según veredicto simulado; CA-01.1 en integración.
 
 ### T-07 · Integración MOD-01 → `api` → MOD-02 → MOD-03
-- **Objetivo:** cerrar el flujo de punta a punta con el contrato de la sección 5.
-- **Terminado:** todas las pruebas de la sección 10 pasan y la evidencia queda guardada.
+- **Objetivo:** montar `POST /api/validar` en `backend/api/` y encadenar MOD-02 → MOD-03 (ya listos y probados aislados; **no se tocan**). `api/` es un orquestador delgado.
+- **Veredicto en un solo lugar:** MOD-02 y MOD-03 devuelven un **código**; `api/` lo traduce con UT-02 al veredicto del contrato §5 (`{valido:false, codigo, titulo, mensaje, accion}`), en un único punto.
+- **Códigos de estado:** 200 siempre que pueda emitir veredicto (un rechazo es resultado de negocio); 500 solo ante fallo interno, con el **mensaje genérico de UT-02** (el pendiente de §5) y **sin detalles técnicos**.
+- **Límite:** lo sigue aplicando MOD-02 leyendo por bloques, **no** FastAPI ni el servidor (si lo corta la infraestructura, CA-02.2 deja de probar el código).
+- **Arranque:** falla ruidoso si UT-03 está incompleta (`CONFIGURACION_INCOMPLETA`), como pide T-01.
+- **Mismo origen:** sirve el frontend como archivos estáticos para que `fetch("/api/validar")` no cruce orígenes.
+- **Opcional:** servir a la vista los formatos permitidos y el tamaño máximo desde UT-03 (sin `accept` en el selector, para que un `.png` siga siendo elegible y dé el mensaje de CA-01.3).
+- **Terminado:** CA-01.1 de punta a punta (sube el `.jdx` válido → nombre + «Analizar» habilitado) y el resto de la sección 10 en integración; con eso cierra **H5** y el incremento es demostrable. La prueba automatizada usa el `.jdx` fabricado de `datos/pruebas/`; la captura de evidencia puede usar el acetona local.
 
 ## 9. Qué puede probarse aislado (Paso 3 del Plan V3)
 
