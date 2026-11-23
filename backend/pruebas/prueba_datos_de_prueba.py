@@ -60,6 +60,7 @@ ESPERADOS = (
     "espectro-factores.jdx",
     "espectro-descendente.jdx",
     "espectro-porcentaje.csv",
+    "espectro-linea-plana.csv",
     "archivo-vacio.csv",
     "binario-disfrazado.csv",
     "imagen.png",
