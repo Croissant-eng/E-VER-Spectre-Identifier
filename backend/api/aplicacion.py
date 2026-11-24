@@ -55,7 +55,9 @@ from backend.preprocesamiento import procesar
 from backend.utilerias import mensajes
 from backend.utilerias.configuracion import Configuracion, ErrorDeConfiguracion
 from backend.utilerias.configuracion import obtener as obtener_configuracion
+from backend.educativo import explicar
 from backend.utilerias.catalogo import obtener as obtener_catalogo
+from backend.utilerias.catalogo import obtener_plantillas
 from backend.validacion import validar
 from motor_identificacion.inferencia import ModeloML, identificar, motivo_para_solo_reglas
 
@@ -170,6 +172,36 @@ def crear_aplicacion(
     # UT-01 se lee una vez al arrancar, igual que UT-03: si el catálogo está
     # roto, mejor no arrancar que fallar en el primer análisis.
     catalogo = obtener_catalogo()
+    plantillas = obtener_plantillas()
+
+    def explicar_detecciones(resultado: Any) -> dict[str, Any]:
+        """MOD-07 para cada grupo detectado (incremento 4).
+
+        Un grupo sin plantilla, o cuya explicación falle, se registra como
+        error y se queda sin texto; los demás se explican igual (CA-07.3).
+        """
+        explicaciones: dict[str, Any] = {}
+        for deteccion in resultado.detecciones:
+            try:
+                explicacion = explicar(
+                    deteccion.grupo, deteccion.pico_cm1, catalogo, plantillas
+                )
+            except Exception:
+                _registro.exception(
+                    "educativo | grupo=%s | resultado=%s",
+                    deteccion.grupo,
+                    mensajes.EXPLICACION_NO_DISPONIBLE,
+                )
+                continue
+            if not explicacion.disponible:
+                _registro.error(
+                    "educativo | grupo=%s | resultado=%s",
+                    deteccion.grupo,
+                    mensajes.EXPLICACION_NO_DISPONIBLE,
+                )
+                continue
+            explicaciones[deteccion.grupo] = explicacion
+        return explicaciones
     motivo = motivo_para_solo_reglas(modelo, parametros)
     if motivo is not None:
         # D-16: la falta de modelo es una degradación anunciada, no un error.
@@ -322,7 +354,14 @@ def crear_aplicacion(
                 resultado.modo,
                 ",".join(d.grupo for d in resultado.detecciones) or "ninguna",
             )
-            return JSONResponse(analizado(resultado, catalogo, parametros))
+            return JSONResponse(
+                analizado(
+                    resultado,
+                    catalogo,
+                    parametros,
+                    explicar_detecciones(resultado),
+                )
+            )
         except Exception:
             _registro.exception(
                 "api fallo interno | ruta=%s | resultado=%s",

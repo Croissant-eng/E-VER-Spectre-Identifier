@@ -22,7 +22,11 @@ import {
   vistaGraficaEsperando,
   vistaGraficaOculta,
 } from "../visor-espectro/configuracion.js";
-import { elementosDeGrafica, pintarGrafica } from "../visor-espectro/visor.js";
+import {
+  elementosDeGrafica,
+  pintarGrafica,
+  resaltar,
+} from "../visor-espectro/visor.js";
 import {
   vistaAnalisisEsperando,
   vistaAnalisisOculta,
@@ -47,6 +51,27 @@ export function conectar(documento, opciones = {}) {
 
   // El espectro procesado del archivo actual. Es lo que se manda a analizar.
   let espectroActual = null;
+  // Incremento 4: las filas del último análisis y los grupos resaltados.
+  let filasActuales = [];
+  const elegidos = new Set();
+
+  const alResaltar = (grupo, elegido) => {
+    if (elegido) {
+      elegidos.add(grupo);
+    } else {
+      elegidos.delete(grupo);
+    }
+    resaltar(
+      grafica,
+      filasActuales.filter((fila) => elegidos.has(fila.grupo)),
+    );
+  };
+
+  const olvidarResaltado = () => {
+    filasActuales = [];
+    elegidos.clear();
+    resaltar(grafica, []);
+  };
 
   pintar(vistaInicial(), elementos);
   pintarGrafica(vistaGraficaOculta(), grafica);
@@ -74,6 +99,7 @@ export function conectar(documento, opciones = {}) {
 
     validar.disabled = true;
     espectroActual = null;
+    olvidarResaltado();
     pintar(vistaEsperando(elegido.name), elementos);
     // Una gráfica o un análisis de un archivo anterior no se quedan en pantalla.
     pintarGrafica(vistaGraficaOculta(), grafica);
@@ -106,9 +132,12 @@ export function conectar(documento, opciones = {}) {
       return;
     }
     botonAnalizar.disabled = true;
+    olvidarResaltado();
     pintarAnalisis(vistaAnalisisEsperando(), analisis);
     const respuesta = await analizarEspectro(espectroActual, opciones);
-    pintarAnalisis(vistaDeAnalisis(respuesta), analisis);
+    const vista = vistaDeAnalisis(respuesta);
+    filasActuales = vista.filas;
+    pintarAnalisis(vista, analisis, { alResaltar, elegidos });
     // Pase lo que pase, el archivo y su espectro siguen cargados y se puede
     // volver a intentar (CA-05.4).
     botonAnalizar.disabled = false;

@@ -161,6 +161,8 @@ CODIGOS_ESPERADOS = (
     mensajes.ESPECTRO_INVALIDO,
     mensajes.ANALISIS_FALLIDO,
     mensajes.SIN_DETECCIONES,
+    # Agregado en el incremento 4 para el grupo sin plantilla (CA-07.3).
+    mensajes.EXPLICACION_NO_DISPONIBLE,
 )
 
 

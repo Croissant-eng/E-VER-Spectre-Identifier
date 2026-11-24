@@ -113,6 +113,8 @@ def prueba_la_respuesta_trae_las_llaves_del_contrato_de_mod06(cliente) -> None:
     assert set(datos) == {"valido", "detecciones", "sin_detecciones", "umbral", "modo"}
     assert set(datos["detecciones"][0]) == {
         "grupo", "nombre", "confianza", "porcentaje", "region_cm1", "pico_cm1", "evidencia",
+        # Agregada en el incremento 4 por MOD-07.
+        "explicacion",
     }
     assert set(datos["detecciones"][0]["evidencia"]) == {"regla", "ml"}
     assert datos["umbral"] == obtener_configuracion().motor.umbral_confianza

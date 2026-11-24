@@ -105,8 +105,30 @@ def _redondeado(valor: float | None) -> float | None:
     return None if valor is None else round(valor, DECIMALES_CONFIANZA)
 
 
+def _explicacion(
+    explicacion: Any, configuracion: Configuracion | None
+) -> dict[str, Any]:
+    """La explicación de MOD-07 lista para la página (incremento 4).
+
+    Si no hay plantilla se manda el aviso de UT-02 en lugar del texto
+    (CA-07.3). El grupo no desaparece de la lista.
+    """
+    if explicacion is not None and explicacion.disponible:
+        return explicacion.como_diccionario()
+    mensaje = mensajes.obtener(mensajes.EXPLICACION_NO_DISPONIBLE, configuracion)
+    return {
+        "disponible": False,
+        "titulo": mensaje.titulo,
+        "mensaje": mensaje.texto,
+        "accion": mensaje.accion,
+    }
+
+
 def analizado(
-    resultado: Any, catalogo: Any, configuracion: Configuracion | None = None
+    resultado: Any,
+    catalogo: Any,
+    configuracion: Configuracion | None = None,
+    explicaciones: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """El cuerpo de POST /api/analizar (incremento 3).
 
@@ -120,6 +142,8 @@ def analizado(
         resultado: el ResultadoMotor de la fusión (T-17).
         catalogo: el de UT-01, para los nombres.
         configuracion: la de UT-03, para que el aviso nombre el umbral.
+        explicaciones: las de MOD-07 por grupo (incremento 4). Si es None
+            las detecciones salen sin explicación, como en el incremento 3.
     """
     contrato = resultado.como_contrato()
     for deteccion in contrato["detecciones"]:
@@ -128,6 +152,10 @@ def analizado(
         deteccion["evidencia"] = {
             clave: _redondeado(valor) for clave, valor in deteccion["evidencia"].items()
         }
+        if explicaciones is not None:
+            deteccion["explicacion"] = _explicacion(
+                explicaciones.get(deteccion["grupo"]), configuracion
+            )
 
     cuerpo: dict[str, Any] = {"valido": True, **contrato}
     if resultado.sin_detecciones:
