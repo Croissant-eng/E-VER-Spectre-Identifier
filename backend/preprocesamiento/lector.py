@@ -5,7 +5,10 @@ número de onda y la intensidad. Los dos formatos terminan en la misma forma,
 así que el resto de MOD-04 ya no necesita saber de dónde vino el espectro.
 
 MOD-03 ya revisó el archivo antes de que llegue aquí, pero solo con una
-lectura ligera del encabezado. Esta es la lectura completa: aplica los
+lectura ligera del encabezado. La lectura de bajo nivel (separador y
+encabezado del CSV, etiquetas del JCAMP-DX) la hacen los dos módulos con el
+mismo lector compartido de D-2, en backend/nucleo/lector_espectro.py, para
+que vean exactamente el mismo archivo. Lo de aquí es la lectura completa: aplica los
 factores de escala, descomprime los datos de JCAMP-DX y comprueba que salgan
 tantos puntos como dice el encabezado. Si algo no cuadra, el archivo se
 rechaza con el código DATOS_ILEGIBLES de UT-02. Nunca se devuelven valores
@@ -21,14 +24,21 @@ import math
 import re
 from dataclasses import dataclass
 
+from backend.nucleo.lector_espectro import (
+    EXTENSION_CSV,
+    EXTENSION_JDX,
+    LecturaFallida,
+    extension_de,
+    leer_cabecera_jdx,
+    leer_tabla_csv,
+)
+
 #: Unidades de intensidad que entiende MOD-04. Cuando un CSV no dice en qué
 #: unidad viene, se marca como desconocida y T-09 la decide por los valores.
 ABSORBANCIA = "absorbancia"
 TRANSMITANCIA = "transmitancia"
 DESCONOCIDA = "desconocida"
 
-EXTENSION_JDX = ".jdx"
-EXTENSION_CSV = ".csv"
 
 
 class ArchivoIlegible(Exception):
@@ -37,6 +47,15 @@ class ArchivoIlegible(Exception):
     El texto de la excepción es para el equipo y para el registro. Nunca lleva
     valores del espectro y nunca se le muestra al usuario, que recibe el
     mensaje de UT-02.
+    """
+
+
+class UnidadNoSoportada(ArchivoIlegible):
+    """La intensidad no viene en transmitancia ni en absorbancia (D-10).
+
+    Por ejemplo reflectancia o índice de refracción. MOD-03 deja pasar la
+    unidad sin juzgarla; aquí se revisa antes de convertir, porque es donde se
+    aplica la fórmula.
     """
 
 
@@ -59,17 +78,12 @@ def leer(nombre: str, contenido: str) -> Lectura:
     Levanta ArchivoIlegible si la extensión no es una de las dos que sabe leer
     o si los datos no se pueden interpretar.
     """
-    extension = _extension(nombre)
+    extension = extension_de(nombre)
     if extension == EXTENSION_JDX:
         return leer_jdx(contenido)
     if extension == EXTENSION_CSV:
         return leer_csv(contenido)
     raise ArchivoIlegible("MOD-04 no sabe leer archivos con esa extensión")
-
-
-def _extension(nombre: str) -> str:
-    punto = nombre.rfind(".")
-    return nombre[punto:].lower() if punto > 0 else ""
 
 
 # Lectura del CSV
@@ -78,46 +92,13 @@ def _extension(nombre: str) -> str:
 # encabezado opcional y separador de coma o de punto y coma. Con punto y coma el
 # decimal puede venir con coma, como lo guarda Excel en español.
 
-_LETRA = re.compile(r"[^\W\d_]")
-
-
 def leer_csv(contenido: str) -> Lectura:
-    pares: list[tuple[float, float]] = []
-    separador: str | None = None
-    encabezado = ""
-
-    for linea in contenido.splitlines():
-        if not linea.strip():
-            continue
-        if separador is None:
-            separador = ";" if ";" in linea else ","
-
-        campos = [campo.strip() for campo in linea.split(separador)]
-        par = _par_csv(campos, separador)
-        if par is None:
-            if not pares and not encabezado and _LETRA.search(linea):
-                encabezado = linea
-                continue
-            raise ArchivoIlegible("una fila del CSV no trae dos números")
-        pares.append(par)
-
-    if not pares:
-        raise ArchivoIlegible("el CSV no trae datos")
-    return Lectura(tuple(pares), _unidad_del_encabezado(encabezado))
-
-
-def _par_csv(campos: list[str], separador: str) -> tuple[float, float] | None:
-    if len(campos) != 2:
-        return None
-    if separador == ";":
-        campos = [campo.replace(",", ".") for campo in campos]
+    """Lee el CSV con el lector compartido y toma la unidad del encabezado."""
     try:
-        onda, intensidad = float(campos[0]), float(campos[1])
-    except ValueError:
-        return None
-    if not (math.isfinite(onda) and math.isfinite(intensidad)):
-        return None
-    return onda, intensidad
+        tabla = leer_tabla_csv(contenido)
+    except LecturaFallida as error:
+        raise ArchivoIlegible(str(error)) from error
+    return Lectura(tabla.pares, _unidad_del_encabezado(tabla.encabezado))
 
 
 def _unidad_del_encabezado(encabezado: str) -> str:
@@ -142,14 +123,16 @@ def _unidad_del_encabezado(encabezado: str) -> str:
 # intensidades seguidas, y es la forma en que suelen venir comprimidos los
 # archivos de NIST.
 
-_IGNORADO_EN_ETIQUETAS = re.compile(r"[\s\-_/]")
 _FORMA_PARES = "(XY..XY)"
 _FORMA_SEGUIDA = "(X++(Y..Y))"
-_ETIQUETAS_DE_DATOS = ("XYDATA", "PEAKTABLE")
 
 
 def leer_jdx(contenido: str) -> Lectura:
-    etiquetas, forma, lineas = _partes_jdx(contenido)
+    try:
+        cabecera = leer_cabecera_jdx(contenido)
+    except LecturaFallida as error:
+        raise ArchivoIlegible(str(error)) from error
+    etiquetas, forma, lineas = cabecera.etiquetas, cabecera.forma, list(cabecera.lineas_de_datos)
 
     unidad_x = etiquetas.get("XUNITS", "").upper()
     if unidad_x and "CM" not in unidad_x:
@@ -175,36 +158,6 @@ def leer_jdx(contenido: str) -> Lectura:
             )
 
     return Lectura(tuple(pares), _unidad_jdx(etiquetas.get("YUNITS", "")))
-
-
-def _partes_jdx(contenido: str) -> tuple[dict[str, str], str, list[str]]:
-    """Separa las etiquetas, la forma del bloque de datos y sus líneas."""
-    etiquetas: dict[str, str] = {}
-    forma = ""
-    lineas: list[str] = []
-    dentro_de_datos = False
-
-    for linea in contenido.splitlines():
-        sin_comentario = linea.split("$$", 1)[0].strip()
-        if not sin_comentario:
-            continue
-        if sin_comentario.startswith("##"):
-            if dentro_de_datos:
-                break
-            nombre, _, valor = sin_comentario[2:].partition("=")
-            nombre = _IGNORADO_EN_ETIQUETAS.sub("", nombre).upper()
-            if nombre in _ETIQUETAS_DE_DATOS:
-                forma = valor.strip()
-                dentro_de_datos = True
-                continue
-            etiquetas.setdefault(nombre, valor.strip())
-            continue
-        if dentro_de_datos:
-            lineas.append(sin_comentario)
-
-    if not dentro_de_datos or not lineas:
-        raise ArchivoIlegible("no se encontró el bloque de datos")
-    return etiquetas, forma, lineas
 
 
 def _numero(etiquetas: dict[str, str], nombre: str, si_falta: float) -> float:
@@ -245,7 +198,7 @@ def _unidad_jdx(unidad: str) -> str:
         return ABSORBANCIA
     if "TRANSM" in texto:
         return TRANSMITANCIA
-    raise ArchivoIlegible("la intensidad no viene en absorbancia ni en transmitancia")
+    raise UnidadNoSoportada("la intensidad no viene en absorbancia ni en transmitancia")
 
 
 def _leer_pares(
