@@ -38,20 +38,25 @@ espectro.
 
 from __future__ import annotations
 
+import json
 import mimetypes
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.entrada_analisis import espectro_desde
+from backend.api.entrada_reporte import peticion_desde
 from backend.api.veredicto import aceptado, analizado, procesado, rechazado
 from backend.manejador_archivos import recibir
 from backend.nucleo import obtener_registro
 from backend.preprocesamiento import procesar
+from backend.reportes import DatosDelReporte, generar_pdf
 from backend.utilerias import mensajes
 from backend.utilerias.configuracion import Configuracion, ErrorDeConfiguracion
 from backend.utilerias.configuracion import obtener as obtener_configuracion
@@ -79,6 +84,15 @@ RUTA_PROCESAR: str = "/api/procesar"
 #: /api/procesar y responde la salida del motor. No recibe el archivo: el motor
 #: solo ve números. `frontend/servicios/analisis.js` repite esta ruta.
 RUTA_ANALIZAR: str = "/api/analizar"
+
+#: Incremento 5. Recibe el espectro, el nombre y la gráfica resaltada como
+#: PNG, y responde el PDF. `frontend/servicios/reporte.js` repite esta ruta.
+RUTA_REPORTE: str = "/api/reporte"
+
+#: Cuántas veces el tamaño máximo de UT-03 puede medir el cuerpo JSON de
+#: /api/analizar y /api/reporte. La imagen en base64 crece un tercio y el
+#: espectro ocupa unas decenas de kilobytes, así que dos veces sobra.
+FACTOR_CUERPO_JSON: int = 2
 
 CAMPO_ARCHIVO: str = "archivo"
 
@@ -132,6 +146,31 @@ def _configuracion_de_arranque() -> Configuracion:
             error,
         )
         raise
+
+
+async def _leer_json(peticion: Request, limite_bytes: int) -> Any:
+    """El JSON del cuerpo, o None si no es JSON o pasa del límite.
+
+    Se lee por bloques y se corta al pasar el límite, igual que MOD-02 hace con
+    los archivos (RNF-03): no se confía en el tamaño que declara el navegador.
+    """
+    recibido = bytearray()
+    async for bloque in peticion.stream():
+        recibido.extend(bloque)
+        if len(recibido) > limite_bytes:
+            return None
+    try:
+        return json.loads(recibido)
+    except ValueError:
+        return None
+
+
+def _nombre_de_descarga(nombre: str) -> str:
+    """El nombre del PDF descargado, solo con letras, números y guiones."""
+    base = nombre.rsplit(".", 1)[0]
+    simple = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode()
+    limpio = re.sub(r"[^A-Za-z0-9_-]+", "-", simple).strip("-")[:80]
+    return f"reporte-{limpio or 'espectro'}.pdf"
 
 
 def crear_aplicacion(
@@ -325,6 +364,8 @@ def crear_aplicacion(
         finally:
             del recepcion
 
+    limite_json = parametros.archivo.tamano_maximo_bytes * FACTOR_CUERPO_JSON
+
     @aplicacion.post(RUTA_ANALIZAR)
     async def analizar_espectro(peticion: Request) -> JSONResponse:
         """MOD-06 sobre el espectro que la página ya tiene (incremento 3).
@@ -336,10 +377,7 @@ def crear_aplicacion(
         con su aviso (CA-08).
         """
         try:
-            try:
-                cuerpo = await peticion.json()
-            except ValueError:
-                cuerpo = None
+            cuerpo = await _leer_json(peticion, limite_json)
             espectro = espectro_desde(cuerpo, parametros)
             if espectro is None:
                 _registro.warning(
@@ -371,6 +409,54 @@ def crear_aplicacion(
             return JSONResponse(
                 status_code=CODIGO_FALLO_INTERNO,
                 content=rechazado(mensajes.ANALISIS_FALLIDO, parametros),
+            )
+
+    @aplicacion.post(RUTA_REPORTE)
+    async def descargar_reporte(peticion: Request) -> Response:
+        """MOD-08: el PDF del análisis (incremento 5).
+
+        Vuelve a correr el motor y MOD-07 con el espectro que manda la página,
+        así el reporte sale del mismo cálculo que se vio en pantalla. Responde
+        el PDF armado en memoria; el servidor no lo guarda (RNF-09). Si la
+        petición no trae lo necesario responde 200 con REPORTE_INVALIDO; si
+        algo falla al generar, 500 con REPORTE_FALLIDO (CA-09.3).
+        """
+        try:
+            cuerpo = await _leer_json(peticion, limite_json)
+            datos = peticion_desde(cuerpo, parametros)
+            if datos is None:
+                _registro.warning("api reporte | resultado=%s", mensajes.REPORTE_INVALIDO)
+                return JSONResponse(rechazado(mensajes.REPORTE_INVALIDO, parametros))
+
+            resultado = identificar(datos.espectro, modelo, catalogo, parametros)
+            analisis = analizado(
+                resultado, catalogo, parametros, explicar_detecciones(resultado)
+            )
+            pdf = generar_pdf(
+                DatosDelReporte(
+                    nombre_archivo=datos.nombre,
+                    fecha_hora=datos.fecha_hora,
+                    zona=datos.zona,
+                    analisis=analisis,
+                    imagen_png=datos.imagen_png,
+                )
+            )
+            _registro.info("api reporte | bytes=%d", len(pdf))
+            descarga = _nombre_de_descarga(datos.nombre)
+            return Response(
+                content=pdf,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{descarga}"'},
+            )
+        except Exception:
+            _registro.exception(
+                "api fallo interno | ruta=%s | resultado=%s",
+                RUTA_REPORTE,
+                mensajes.REPORTE_FALLIDO,
+            )
+            return JSONResponse(
+                status_code=CODIGO_FALLO_INTERNO,
+                content=rechazado(mensajes.REPORTE_FALLIDO, parametros),
             )
 
     @aplicacion.get("/")

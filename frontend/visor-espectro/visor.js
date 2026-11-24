@@ -145,3 +145,23 @@ export function resaltar(elementos, elegidos) {
   }
   leyenda.hidden = leyenda.children.length === 0;
 }
+
+/**
+ * La gráfica como imagen PNG para el reporte (incremento 5, T-26).
+ *
+ * Para la imagen se resaltan todos los grupos detectados, porque CA-09.1 pide
+ * la gráfica con las regiones resaltadas. Después se regresa al resaltado
+ * que la persona tenía elegido.
+ *
+ * @returns {string|null} la imagen como data URL, o null si no hay gráfica.
+ */
+export function imagenDeGrafica(elementos, detectados, elegidos) {
+  const grafica = graficaDe(elementos.lienzo);
+  if (!grafica) {
+    return null;
+  }
+  resaltar(elementos, detectados);
+  const imagen = grafica.toBase64Image("image/png", 1);
+  resaltar(elementos, elegidos);
+  return imagen;
+}

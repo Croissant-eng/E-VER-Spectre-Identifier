@@ -119,6 +119,20 @@
         <p class="analisis-mensaje" id="analisis-mensaje" hidden></p>
         <p class="analisis-accion" id="analisis-accion" hidden></p>
         <ol class="analisis-lista" id="analisis-lista" hidden></ol>
+
+        <!--
+          Incremento 5: el reporte en PDF. Aparece cuando hay un análisis,
+          con grupos o sin ellos. Si falla, el aviso sale aquí mismo y los
+          resultados de arriba no se tocan (CA-09.3).
+        -->
+        <div class="bloque-reporte" id="bloque-reporte" hidden>
+          <button class="boton boton-secundario" type="button" id="descargar-reporte">
+            Descargar reporte
+          </button>
+          <p class="reporte-titulo" id="reporte-titulo" hidden></p>
+          <p class="nota" id="reporte-mensaje" hidden></p>
+          <p class="reporte-accion" id="reporte-accion" hidden></p>
+        </div>
       </section>
     </main>
 

@@ -15,3 +15,8 @@ python-multipart==0.0.34   # requerido por FastAPI para multipart/form-data (POS
 # --- Pruebas (RNF-06) ---
 pytest==9.2.0
 httpx==0.28.1              # cliente de pruebas de FastAPI (TestClient), usado a partir de T-07
+
+# --- Incremento 5 (D-3, elegida por el equipo el 24/11/2026) ---
+reportlab==4.2.5           # arma el PDF del reporte en memoria (MOD-08)
+pillow==12.3.0             # reportlab lo necesita para leer la imagen PNG de la grafica
+pypdf==5.1.0               # solo pruebas: lee el PDF generado para revisar su texto

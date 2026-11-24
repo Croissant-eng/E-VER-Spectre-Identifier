@@ -15,6 +15,7 @@
  */
 
 import { analizarEspectro } from "../servicios/analisis.js";
+import { RESULTADO_PDF, pedirReporte } from "../servicios/reporte.js";
 import { procesarEspectro } from "../servicios/procesamiento.js";
 import { validarEspectro } from "../servicios/validacion.js";
 import {
@@ -24,16 +25,68 @@ import {
 } from "../visor-espectro/configuracion.js";
 import {
   elementosDeGrafica,
+  imagenDeGrafica,
   pintarGrafica,
   resaltar,
 } from "../visor-espectro/visor.js";
 import {
+  ANALISIS_LISTO,
+  ANALISIS_SIN_DETECCIONES,
   vistaAnalisisEsperando,
   vistaAnalisisOculta,
   vistaDeAnalisis,
 } from "./analisis.js";
 import { elementosDe, pintar } from "./pintar.js";
 import { elementosDeAnalisis, pintarAnalisis } from "./pintar-analisis.js";
+import {
+  vistaDeReporte,
+  vistaReporteGenerando,
+  vistaReporteListo,
+  vistaReporteOculta,
+} from "./reporte.js";
+
+/** Los elementos del bloque del reporte (incremento 5). */
+function elementosDeReporte(documento) {
+  return {
+    bloque: documento.getElementById("bloque-reporte"),
+    boton: documento.getElementById("descargar-reporte"),
+    titulo: documento.getElementById("reporte-titulo"),
+    mensaje: documento.getElementById("reporte-mensaje"),
+    accion: documento.getElementById("reporte-accion"),
+  };
+}
+
+function escribirTexto(elemento, contenido) {
+  if (elemento) {
+    elemento.textContent = contenido;
+    elemento.hidden = contenido === "";
+  }
+}
+
+function pintarReporte(vista, elementos) {
+  if (elementos.bloque) {
+    elementos.bloque.hidden = vista.estado === "oculto";
+    elementos.bloque.dataset.estado = vista.estado;
+  }
+  if (elementos.boton) {
+    elementos.boton.disabled = !vista.habilitado;
+  }
+  escribirTexto(elementos.titulo, vista.titulo);
+  escribirTexto(elementos.mensaje, vista.mensaje);
+  escribirTexto(elementos.accion, vista.accion);
+}
+
+/** Entrega el PDF al navegador para que lo guarde. */
+function guardarPdf(documento, pdf, nombre) {
+  const enlace = documento.createElement("a");
+  const direccion = URL.createObjectURL(pdf);
+  enlace.href = direccion;
+  enlace.download = nombre;
+  documento.body.append(enlace);
+  enlace.click();
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(direccion), 0);
+}
 import { vistaDesdeRespuesta, vistaEsperando, vistaInicial } from "./vista.js";
 
 /**
@@ -49,8 +102,11 @@ export function conectar(documento, opciones = {}) {
   const analisis = elementosDeAnalisis(documento);
   const { formulario, archivo, validar, analizar: botonAnalizar } = elementos;
 
+  const reporte = elementosDeReporte(documento);
   // El espectro procesado del archivo actual. Es lo que se manda a analizar.
   let espectroActual = null;
+  // Incremento 5: el nombre que devolvió MOD-02, para el reporte.
+  let nombreActual = "";
   // Incremento 4: las filas del último análisis y los grupos resaltados.
   let filasActuales = [];
   const elegidos = new Set();
@@ -71,6 +127,7 @@ export function conectar(documento, opciones = {}) {
     filasActuales = [];
     elegidos.clear();
     resaltar(grafica, []);
+    pintarReporte(vistaReporteOculta(), reporte);
   };
 
   pintar(vistaInicial(), elementos);
@@ -106,6 +163,7 @@ export function conectar(documento, opciones = {}) {
     pintarAnalisis(vistaAnalisisOculta(), analisis);
 
     const respuesta = await validarEspectro(elegido, opciones);
+    nombreActual = respuesta?.veredicto?.valido ? respuesta.veredicto.nombre : "";
     const aprobado = pintar(vistaDesdeRespuesta(respuesta), elementos);
 
     // Incremento 2: solo un archivo aprobado pasa a MOD-04 y se dibuja. Uno
@@ -138,9 +196,33 @@ export function conectar(documento, opciones = {}) {
     const vista = vistaDeAnalisis(respuesta);
     filasActuales = vista.filas;
     pintarAnalisis(vista, analisis, { alResaltar, elegidos });
+    // Hay reporte con grupos y también sin ellos (CA-09.2).
+    if (vista.estado === ANALISIS_LISTO || vista.estado === ANALISIS_SIN_DETECCIONES) {
+      pintarReporte(vistaReporteListo(), reporte);
+    }
     // Pase lo que pase, el archivo y su espectro siguen cargados y se puede
     // volver a intentar (CA-05.4).
     botonAnalizar.disabled = false;
+  });
+
+  reporte.boton?.addEventListener("click", async () => {
+    if (espectroActual === null) {
+      return;
+    }
+    pintarReporte(vistaReporteGenerando(), reporte);
+    const elegidas = filasActuales.filter((fila) => elegidos.has(fila.grupo));
+    const cuerpo = {
+      nombre: nombreActual,
+      espectro: espectroActual,
+      grafica_png: imagenDeGrafica(grafica, filasActuales, elegidas),
+      zona_horaria_min: new Date().getTimezoneOffset(),
+    };
+    const respuesta = await pedirReporte(cuerpo, opciones);
+    if (respuesta.resultado === RESULTADO_PDF) {
+      guardarPdf(documento, respuesta.pdf, respuesta.nombre);
+    }
+    // Los resultados del análisis no se tocan, salga bien o mal (CA-09.3).
+    pintarReporte(vistaDeReporte(respuesta), reporte);
   });
 
   return elementos;
