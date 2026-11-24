@@ -93,6 +93,10 @@ ANALISIS_FALLIDO = "ANALISIS_FALLIDO"
 #: dentro del resultado del análisis como aviso, nunca como rechazo.
 SIN_DETECCIONES = "SIN_DETECCIONES"
 
+#: Incremento 4. Un grupo detectado no tiene plantilla de explicación
+#: (CA-07.3). El grupo se sigue mostrando con este aviso en lugar del texto.
+EXPLICACION_NO_DISPONIBLE = "EXPLICACION_NO_DISPONIBLE"
+
 
 class CodigoDesconocido(Exception):
     """Se pidió un código que no está en el catálogo.
@@ -335,6 +339,18 @@ _CATALOGO: dict[str, _Entrada] = {
         accion=lambda c: (
             "Revise la calidad del espectro, por ejemplo el ruido, la línea base "
             "o el tramo medido, y vuelva a analizarlo."
+        ),
+    ),
+    # Incremento 4: la capa educativa (CA-07.3).
+    EXPLICACION_NO_DISPONIBLE: _Entrada(
+        titulo="Explicación no disponible",
+        texto=lambda c: (
+            "Este grupo se detectó, pero todavía no hay una explicación escrita "
+            "para él."
+        ),
+        accion=lambda c: (
+            "Consulte la región resaltada en la gráfica y una tabla de "
+            "absorciones infrarrojas para interpretarlo."
         ),
     ),
 }
