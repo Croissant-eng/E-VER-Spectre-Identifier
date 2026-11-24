@@ -228,3 +228,20 @@ def prueba_la_grafica_no_trae_anchos_fijos() -> None:
     assert bloque, "falta el estilo del contenedor de la gráfica"
     assert "width: 100%" in bloque.group(1)
     assert not re.search(r"\bwidth:\s*\d+px", bloque.group(1))
+
+
+def prueba_las_capturas_de_evidencia_de_la_grafica_estan_guardadas() -> None:
+    evidencia = RAIZ / "docs" / "evidencia"
+    faltantes = [
+        nombre
+        for nombre in (
+            "t-12-escritorio-grafica.png",
+            "t-13-movil-360-grafica.png",
+            "t-13-movil-360-sin-grafica.png",
+        )
+        if not (evidencia / nombre).is_file()
+    ]
+    assert not faltantes, (
+        f"faltan capturas: {faltantes}; genérelas con "
+        "«python -m herramientas.capturar_grafica»"
+    )
