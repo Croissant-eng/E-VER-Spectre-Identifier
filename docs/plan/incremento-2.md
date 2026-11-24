@@ -142,7 +142,7 @@ Esta sección se agregó al terminar el incremento. Dice cómo quedaron las deci
 
 **D-1.** Chart.js 4.4.7 y chartjs-plugin-annotation 3.1.0 quedaron en `frontend/vendor/` con su licencia y su huella SHA-256 en `frontend/vendor/LEEME.md`. La configuración de la gráfica es una función pura en `frontend/visor-espectro/configuracion.js`, probada con `node --test`. El complemento de anotaciones queda registrado y vacío para el incremento 4. La prueba de MOD-01 que busca direcciones de internet en el frontend ahora se salta `frontend/vendor/`, porque los comentarios de licencia traen la dirección del proyecto.
 
-**Contrato de la sección 3.** La rejilla tiene 1024 puntos y va de 4000 a 400 cm⁻¹. Los dos valores viven en UT-03, en `procesamiento.puntos_rejilla` y `procesamiento.rango_rejilla_cm1`. El 1024 sale del ejemplo del diseño de MOD-06 y es SUPUESTO.
+**Contrato de la sección 3.** La rejilla tiene 1024 puntos y va de 4000 a 400 cm⁻¹. Los dos valores viven en UT-03, en `procesamiento.puntos_rejilla` y `procesamiento.rango_rejilla_cm1`. El 1024 salió del ejemplo del diseño de MOD-06 y al principio quedó como SUPUESTO. El equipo lo cerró como la decisión D-19 del plan del incremento 3: son unos 3.5 cm⁻¹ por punto, que va con la resolución de los espectros reales, y es potencia de dos, cómoda para la red. Desde que se entrena el modelo (T-16c) ya no se cambia, porque un N distinto deja inservibles los pesos entrenados.
 
 **Otros SUPUESTOS de MOD-04.**
 - Una transmitancia declarada en el encabezado con algún valor mayor que 1.5 se toma como porcentaje.

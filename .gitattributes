@@ -7,3 +7,9 @@
 *.csv   -text
 *.png   binary
 datos/pruebas/** -text
+
+# Las librerias de la grafica tambien se guardan byte a byte. Su huella SHA-256
+# esta escrita en frontend/vendor/LEEME.md y una prueba la compara con el
+# archivo. Si git les pone saltos de linea de Windows al clonar, la huella deja
+# de coincidir aunque la libreria sea la misma.
+frontend/vendor/** -text
