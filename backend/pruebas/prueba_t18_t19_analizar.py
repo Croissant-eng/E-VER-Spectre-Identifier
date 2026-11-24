@@ -31,6 +31,7 @@ from fastapi.testclient import TestClient
 
 from backend.api import RUTA_ANALIZAR, RUTA_PROCESAR, crear_aplicacion
 from backend.api import aplicacion as capa_http
+from backend.api.entrada_analisis import espectro_desde
 from backend.utilerias import mensajes
 from backend.utilerias.configuracion import obtener as obtener_configuracion
 from motor_identificacion.inferencia import MODO_HIBRIDO, MODO_REGLAS
@@ -178,6 +179,8 @@ def _malos(bueno: dict) -> dict[str, object]:
     al_reves = {**bueno, "eje_cm1": list(reversed(bueno["eje_cm1"]))}
     con_texto = {**bueno, "intensidad": ["0.1"] + bueno["intensidad"][1:]}
     medido_al_reves = {**bueno, "rango_medido_cm1": [4000, 400]}
+    medido_al_reves_y_amplio = {**bueno, "rango_medido_cm1": [4500, 250]}
+    medido_fuera = {**bueno, "rango_medido_cm1": [5000, 6000]}
     sin_eje = {k: v for k, v in bueno.items() if k != "eje_cm1"}
     return {
         "intensidad corta": corto,
@@ -185,6 +188,8 @@ def _malos(bueno: dict) -> dict[str, object]:
         "eje al revés": al_reves,
         "número como texto": con_texto,
         "tramo medido al revés": medido_al_reves,
+        "tramo medido al revés y más amplio que la rejilla": medido_al_reves_y_amplio,
+        "tramo medido sin nada dentro de la rejilla": medido_fuera,
         "sin eje": sin_eje,
         "una lista": [1, 2, 3],
         "nada": None,
@@ -221,6 +226,38 @@ def prueba_se_acepta_tambien_la_respuesta_entera_de_procesar(cliente) -> None:
     procesado = _procesar(cliente, "cetona.csv", _csv(_carbonilo))
 
     assert _analizar(cliente, procesado).json()["valido"] is True
+
+
+# Un archivo puede medir más allá de la rejilla: es un espectro bueno
+
+
+@pytest.mark.parametrize(
+    ("desde", "hasta"),
+    [(250, 4000), (400, 4200), (241, 4400)],
+    ids=["por abajo", "por arriba", "por los dos lados"],
+)
+def prueba_un_espectro_que_mide_mas_que_la_rejilla_se_analiza(cliente, desde, hasta) -> None:
+    """MOD-04 informa lo que el archivo midió, aunque rebase 400–4000 cm⁻¹."""
+    filas = ["numero_de_onda,absorbancia"]
+    filas += [f"{onda},{_carbonilo(onda):.6f}" for onda in range(desde, hasta + 1)]
+    espectro = _procesar(cliente, "amplio.csv", "\n".join(filas).encode("utf-8"))["espectro"]
+    assert espectro["rango_medido_cm1"] == [desde, hasta]
+
+    datos = _analizar(cliente, espectro).json()
+
+    assert datos["valido"] is True, datos
+    assert datos["detecciones"][0]["grupo"] == "GF-05"
+
+
+def prueba_el_tramo_medido_se_recorta_a_la_rejilla_de_ut03(cliente) -> None:
+    configuracion = obtener_configuracion()
+    minimo, maximo = configuracion.procesamiento.rango_rejilla_cm1
+    amplio = {**_espectro_bueno(cliente), "rango_medido_cm1": [minimo - 150, maximo + 150]}
+
+    recibido = espectro_desde(amplio, configuracion)
+
+    assert recibido is not None
+    assert recibido.rango_medido_cm1 == (minimo, maximo)
 
 
 # T-19: el fallo del motor (CA-05.4)
@@ -368,3 +405,20 @@ def prueba_ca_05_2_el_acido_benzoico_lista_oh_co_y_aromatico_en_orden(cliente) -
     assert {"GF-01", "GF-05", "GF-07"} <= set(grupos)
     confianzas = [d["confianza"] for d in datos["detecciones"]]
     assert confianzas == sorted(confianzas, reverse=True)
+
+
+@pytest.mark.parametrize(
+    ("archivo", "esperados"),
+    [
+        ("110-82-7-IR(Cyclohexane).jdx", {"GF-03"}),
+        ("110-83-8-IR(Cyclohexene).jdx", {"GF-03", "GF-06"}),
+        ("71-36-3-IR(1-Butanol).jdx", {"GF-01", "GF-03"}),
+    ],
+    ids=["ciclohexano", "ciclohexeno", "1-butanol"],
+)
+def prueba_los_reales_que_rebasan_la_rejilla_se_analizan(cliente, archivo, esperados) -> None:
+    """Los tres miden por debajo de 400 cm⁻¹ y antes salía ESPECTRO_INVALIDO."""
+    datos = _analizar(cliente, _real(cliente, archivo)).json()
+
+    assert datos["valido"] is True, datos
+    assert {d["grupo"] for d in datos["detecciones"]} == esperados
