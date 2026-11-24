@@ -91,10 +91,19 @@ SUBTIPOS_DE_GF05 = (
     ("amida", (1630.0, 1700.0)),
 )
 
-#: El enlace o vibración de cada grupo, de la columna que la sección 4 v1.7
-#: añadió. Solo GF-07 se verifica aquí: su valor venía de MOD-06 §4 y el plan lo
-#: omitía (D-20, correcciones menores).
-ENLACE_DE_GF07 = "estiramiento del anillo"
+#: El enlace o vibración de cada grupo, **literalmente** la columna de la
+#: sección 4 (D-20, punto 2 del bloque aprobado el 24/11/2026). El campo lleva
+#: las dos cosas, enlace y modo: si guardara solo el símbolo, MOD-07 perdería el
+#: modo de vibración al redactar las explicaciones del incremento 4.
+ENLACE_VIBRACION = {
+    "GF-01": "O–H estiramiento",
+    "GF-02": "N–H estiramiento",
+    "GF-03": "C–H estiramiento",
+    "GF-04": "C≡N estiramiento",
+    "GF-05": "C=O estiramiento",
+    "GF-06": "C=C estiramiento",
+    "GF-07": "estiramiento del anillo",
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -235,9 +244,14 @@ def prueba_gf07_exige_el_par_mas_el_ch_aromatico() -> None:
     )
 
 
-def prueba_el_enlace_vibracion_de_gf07_es_el_de_mod06() -> None:
-    """D-20: el plan omitía esta columna; el valor viene de MOD-06 §4."""
-    assert cargar().por_id("GF-07").enlace_vibracion == ENLACE_DE_GF07
+def prueba_el_enlace_vibracion_sigue_la_columna_del_plan() -> None:
+    """D-20 punto 2: los siete siguen literalmente la columna de la sección 4."""
+    catalogo = cargar()
+
+    for identificador, esperado in ENLACE_VIBRACION.items():
+        assert catalogo.por_id(identificador).enlace_vibracion == esperado, (
+            f"{identificador}: el enlace/vibración no es el de la sección 4"
+        )
 
 
 def prueba_un_par_son_exactamente_dos_bandas() -> None:

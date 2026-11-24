@@ -21,7 +21,7 @@
     {
       "id": "GF-01",
       "nombre": "O–H (alcoholes, fenoles y ácidos)",
-      "enlace_vibracion": "O–H",
+      "enlace_vibracion": "O–H estiramiento",
       "region_cm1": [3200, 3550],
       "regiones_acompanantes": [
         { "rango": [2500, 3300], "rol": "indicio" }
@@ -34,7 +34,7 @@
     {
       "id": "GF-02",
       "nombre": "N–H (aminas y amidas)",
-      "enlace_vibracion": "N–H",
+      "enlace_vibracion": "N–H estiramiento",
       "region_cm1": [3300, 3500],
       "regiones_acompanantes": [],
       "intensidad": "media",
@@ -45,7 +45,7 @@
     {
       "id": "GF-03",
       "nombre": "C–H alifático (sp³)",
-      "enlace_vibracion": "C–H",
+      "enlace_vibracion": "C–H estiramiento",
       "region_cm1": [2850, 2960],
       "regiones_acompanantes": [],
       "intensidad": "media",
@@ -56,7 +56,7 @@
     {
       "id": "GF-04",
       "nombre": "C≡N (nitrilos)",
-      "enlace_vibracion": "C≡N",
+      "enlace_vibracion": "C≡N estiramiento",
       "region_cm1": [2210, 2260],
       "regiones_acompanantes": [],
       "intensidad": "media",
@@ -67,7 +67,7 @@
     {
       "id": "GF-05",
       "nombre": "C=O (carbonilo)",
-      "enlace_vibracion": "C=O",
+      "enlace_vibracion": "C=O estiramiento",
       "_nota_subtipos": "Los cinco de MOD-06 §4, informativos para las explicaciones del incremento 4 (T-20). En el incremento 3 GF-05 es una sola detección: RF-04 pide los siete grupos, no sus subtipos. Limitación conocida que el plan §4 documenta: la amida se extiende por debajo de la región principal, así que una amida de C=O bajo queda fuera de donde GF-05 se detecta. No se ensancha GF-05 (sería cambio de alcance) y el subtipo no amplía ninguna detección.",
       "region_cm1": [1670, 1780],
       "regiones_acompanantes": [],
@@ -85,7 +85,7 @@
     {
       "id": "GF-06",
       "nombre": "C=C (alquenos)",
-      "enlace_vibracion": "C=C",
+      "enlace_vibracion": "C=C estiramiento",
       "_nota_forma": "El plan no le asigna forma a este grupo: la columna de la sección 4 solo dice «Media / débil». Se deja en null en vez de inventarla.",
       "region_cm1": [1620, 1680],
       "regiones_acompanantes": [
