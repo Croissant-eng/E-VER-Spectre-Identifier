@@ -20,9 +20,21 @@
     "umbral_confianza": 0.6,
     "peso_reglas": 0.5,
     "peso_ml": 0.5,
-    "_nota_anchos": "D-20 · T-15a. Los dos umbrales de ancho están en null porque siguen siendo SUPUESTO: la medición ya existe (docs/evidencia/d-20-anchos.md), pero el equipo todavía no aprueba el valor. Mientras sean null, T-15b no puede aplicar R-1 ni R-4, y eso es intencional: mejor detenerse que arrancar con un número inventado.",
+    "_nota_anchos": "D-20, aprobado el 24/11/2026 · medición en docs/evidencia/d-20-anchos.md. ATENCIÓN: el nivel al que se mide el ancho DIFIERE entre las dos reglas a propósito. R-1 mide al 50 % de la altura; R-4 al 80 %. No los uniforme: al 50 % la métrica de R-4 no separa las clases, y ese fue el hallazgo de T-15a. La definición es parte del parámetro.",
     "tolerancia_banda_puntual_cm1": 15,
-    "ancho_media_altura_umbral_cm1": null,
-    "ancho_pico_agudo_max_cm1": null
+    "ancho_media_altura_umbral_cm1": 175,
+    "ancho_pico_agudo_max_cm1": 160,
+    "fuerza_minima_relativa": {
+      "_nota": "D-22 · T-15d. Fuerza mínima DENTRO de la región del grupo, por la clase de intensidad del catálogo, como fracción de la banda más intensa. Medición en docs/evidencia/d-21-fuerza.md. El piso débil va por prominencia y se calibró con UN solo espectro (ciclohexeno); los tres salen de los mismos 8 espectros con que se evalúan.",
+      "fuerte": { "piso": 0.10, "medida": "altura" },
+      "media": { "piso": 0.025, "medida": "altura" },
+      "debil": { "piso": 0.029, "medida": "prominencia" }
+    },
+    "definicion_metodo": {
+      "_nota": "D-21 · T-15c. DEFINICIÓN DEL MÉTODO, NO AJUSTE. Dicen CÓMO se mide un ancho; los cortes de arriba dicen CUÁNTO. ancho_media_altura_umbral_cm1 (175) y ancho_pico_agudo_max_cm1 (160) se calibraron con margen 200 y con estas fracciones: si alguno de los tres cambia, 175 y 160 dejan de significar lo que significan y hay que volver a medirlos.",
+      "fraccion_r1": 0.5,
+      "fraccion_r4": 0.8,
+      "margen_linea_base_cm1": 200
+    }
   }
 }

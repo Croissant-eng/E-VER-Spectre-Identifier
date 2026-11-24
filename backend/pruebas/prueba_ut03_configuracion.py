@@ -120,6 +120,95 @@ def prueba_el_bloque_motor_no_es_obligatorio_en_este_incremento(tmp_path: Path) 
 
 
 # --------------------------------------------------------------------------- #
+# T-15c · la definición del método de medición vive junto a sus cortes (D-21)
+# --------------------------------------------------------------------------- #
+
+
+def prueba_la_definicion_del_metodo_llega_con_sus_valores() -> None:
+    """Se movieron del código del motor con el valor que tenían: 0.5, 0.8 y 200."""
+    motor = cargar().motor
+    assert motor is not None
+    assert motor.definicion_metodo.fraccion_r1 == 0.5
+    assert motor.definicion_metodo.fraccion_r4 == 0.8
+    assert motor.definicion_metodo.margen_linea_base_cm1 == 200
+
+
+@pytest.mark.parametrize("llave", ["fraccion_r1", "fraccion_r4", "margen_linea_base_cm1"])
+def prueba_falta_una_llave_de_la_definicion_y_no_arranca(
+    tmp_path: Path, llave: str
+) -> None:
+    datos = _datos_del_repositorio()
+    del datos["motor"]["definicion_metodo"][llave]
+
+    with pytest.raises(ErrorDeConfiguracion, match=f"definicion_metodo.{llave}"):
+        cargar(_escribir(tmp_path, datos))
+
+
+def prueba_falta_la_definicion_completa_y_no_arranca(tmp_path: Path) -> None:
+    """Un corte sin su definición no significa nada: no se arranca con la mitad."""
+    datos = _datos_del_repositorio()
+    del datos["motor"]["definicion_metodo"]
+
+    with pytest.raises(ErrorDeConfiguracion, match="definicion_metodo"):
+        cargar(_escribir(tmp_path, datos))
+
+
+@pytest.mark.parametrize(
+    ("llave", "valor"),
+    [
+        ("fraccion_r1", 0),
+        ("fraccion_r1", 1),
+        ("fraccion_r4", 80),
+        ("fraccion_r4", "0.8"),
+        ("fraccion_r4", True),
+        ("margen_linea_base_cm1", 0),
+        ("margen_linea_base_cm1", -200),
+        ("margen_linea_base_cm1", "200"),
+    ],
+)
+def prueba_una_definicion_incoherente_y_no_arranca(
+    tmp_path: Path, llave: str, valor: Any
+) -> None:
+    datos = _datos_del_repositorio()
+    datos["motor"]["definicion_metodo"][llave] = valor
+
+    with pytest.raises(ErrorDeConfiguracion, match=f"definicion_metodo.{llave}"):
+        cargar(_escribir(tmp_path, datos))
+
+
+def prueba_los_pisos_de_fuerza_llegan_con_su_medida() -> None:
+    """D-22: los valores aprobados, y la clase débil por prominencia."""
+    motor = cargar().motor
+    assert motor is not None
+    assert {c: (p.piso, p.medida) for c, p in motor.fuerza_minima_relativa.items()} == {
+        "fuerte": (0.10, "altura"),
+        "media": (0.025, "altura"),
+        "debil": (0.029, "prominencia"),
+    }
+    with pytest.raises(TypeError):
+        motor.fuerza_minima_relativa["fuerte"] = None  # type: ignore[index]
+
+
+@pytest.mark.parametrize("clase", ["fuerte", "media", "debil"])
+@pytest.mark.parametrize(
+    "valor",
+    [None, 0.1, {"piso": 0.1}, {"medida": "altura"}, {"piso": 0, "medida": "altura"},
+     {"piso": 1.5, "medida": "altura"}, {"piso": 0.1, "medida": "area"}],
+)
+def prueba_un_piso_incoherente_o_ausente_y_no_arranca(
+    tmp_path: Path, clase: str, valor: Any
+) -> None:
+    datos = _datos_del_repositorio()
+    if valor is None:
+        del datos["motor"]["fuerza_minima_relativa"][clase]
+    else:
+        datos["motor"]["fuerza_minima_relativa"][clase] = valor
+
+    with pytest.raises(ErrorDeConfiguracion, match=f"fuerza_minima_relativa.*{clase}|{clase}"):
+        cargar(_escribir(tmp_path, datos))
+
+
+# --------------------------------------------------------------------------- #
 # UT-03 · configuración incompleta (sección 10)
 # --------------------------------------------------------------------------- #
 

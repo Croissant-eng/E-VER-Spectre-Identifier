@@ -698,6 +698,9 @@ VALORES_PROHIBIDOS = [
 #: El código de la aplicación. `herramientas/` queda fuera a propósito: son
 #: utilidades de desarrollo (capturas, descargas) con milisegundos y píxeles que
 #: coinciden por casualidad con números de onda.
+#: `motor_identificacion/` se vigila dos veces: aquí por texto, y por árbol
+#: sintáctico en `prueba_el_motor_no_escribe_ni_regiones_ni_cortes`
+#: (`prueba_t15_reglas.py`), que cubre además los cortes de UT-03.
 CARPETAS_REVISADAS = [
     (RAIZ / "backend", "*.py"),
     (RAIZ / "motor_identificacion", "*.py"),
@@ -722,6 +725,9 @@ def prueba_ningun_numero_de_region_aparece_fuera_del_catalogo() -> None:
     assert not (RAIZ / "motor-identificacion").exists(), (
         "volvió la carpeta con guion: el renombre de D-7 está a medias y esta "
         "prueba estaría revisando la carpeta equivocada"
+    )
+    assert any((RAIZ / "motor_identificacion").rglob("*.py")), (
+        "no hay código del motor que vigilar"
     )
 
     hallazgos: list[str] = []

@@ -23,7 +23,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Mapping
 
 #: Carpeta de UT-03 dentro del repositorio.
 CARPETA: Path = Path(__file__).resolve().parent
@@ -84,6 +85,63 @@ class ParametrosProcesamiento:
 
 
 @dataclass(frozen=True)
+class DefinicionMetodo:
+    """Cómo se mide un ancho. **Definición del método, no ajuste** (D-21).
+
+    Los cortes de `ParametrosMotor` (175 y 160 cm⁻¹) se calibraron con estos
+    valores: si alguno cambia, dejan de significar lo que significan y hay que
+    volver a medirlos. Por eso viven en el mismo bloque del mismo archivo.
+    """
+
+    #: Fracción de la altura a la que R-1 y R-4 miden el ancho. Difieren a
+    #: propósito (D-20): no se uniforman.
+    fraccion_r1: float
+    fraccion_r4: float
+    #: Cuánto se extiende el vecindario de la línea base a cada lado.
+    margen_linea_base_cm1: float
+
+
+#: Clases de intensidad con piso, y las medidas de fuerza que existen.
+CLASES_DE_FUERZA: tuple[str, ...] = ("fuerte", "media", "debil")
+MEDIDAS_DE_FUERZA: tuple[str, ...] = ("altura", "prominencia")
+
+
+@dataclass(frozen=True)
+class PisoDeFuerza:
+    """La fuerza mínima de una banda dentro de su región (D-22).
+
+    El piso viaja con su medida: un número calibrado por prominencia no
+    significa nada comparado con una altura.
+    """
+
+    piso: float
+    medida: str
+
+
+@dataclass(frozen=True)
+class ParametrosMotor:
+    """Los cortes que usa la vía de reglas de MOD-06 desde el incremento 3.
+
+    Son los tres de D-20, aprobados el 24/11/2026 con su medición en
+    `docs/evidencia/d-20-anchos.md`.
+
+    **El nivel al que se mide el ancho difiere entre las dos reglas a
+    propósito:** R-1 mide al 50 % de la altura del pico y R-4 al 80 %. No es un
+    descuido y no deben uniformarse — al 50 % la métrica de R-4 no separa las
+    clases. La definición es parte del parámetro.
+
+    El umbral del 60 % y los pesos de la fusión **no** están aquí todavía: son
+    de T-17, que los añade con su propia validación.
+    """
+
+    tolerancia_banda_puntual_cm1: float
+    ancho_media_altura_umbral_cm1: float
+    ancho_pico_agudo_max_cm1: float
+    definicion_metodo: DefinicionMetodo
+    fuerza_minima_relativa: Mapping[str, PisoDeFuerza]
+
+
+@dataclass(frozen=True)
 class Configuracion:
     """Los parámetros ya validados, listos para usarse."""
 
@@ -91,6 +149,10 @@ class Configuracion:
     validacion: ParametrosValidacion
     procesamiento: ParametrosProcesamiento
     ruta: Path
+    #: Sigue siendo opcional: el bloque `motor` no existía antes del incremento
+    #: 3 y una copia vieja del archivo debe poder arrancar. Quien lo necesita
+    #: (MOD-06) comprueba que esté y falla con un mensaje claro si falta.
+    motor: ParametrosMotor | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -136,6 +198,53 @@ def _entero_positivo(
     if valor <= 0:
         raise _error(f"«{prefijo}.{llave}» debe ser mayor que cero, no {valor}", ruta)
     return valor
+
+
+def _numero_positivo(
+    bloque: dict[str, Any], llave: str, ruta: Path, prefijo: str
+) -> float:
+    """Un corte en cm⁻¹: puede traer decimales, pero no ser cero ni negativo."""
+    valor = _presente(bloque, llave, ruta, prefijo)
+    if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+        raise _error(
+            f"«{prefijo}.{llave}» debe ser un número, no {type(valor).__name__}",
+            ruta,
+        )
+    if valor <= 0:
+        raise _error(f"«{prefijo}.{llave}» debe ser mayor que cero, no {valor}", ruta)
+    return float(valor)
+
+
+def _fraccion(bloque: dict[str, Any], llave: str, ruta: Path, prefijo: str) -> float:
+    """Una fracción de la altura: estrictamente entre 0 y 1."""
+    valor = _numero_positivo(bloque, llave, ruta, prefijo)
+    if valor >= 1:
+        raise _error(
+            f"«{prefijo}.{llave}» debe ser una fracción entre 0 y 1, no {valor:g}",
+            ruta,
+        )
+    return valor
+
+
+def _pisos_de_fuerza(
+    bloque_motor: dict[str, Any], ruta: Path
+) -> Mapping[str, PisoDeFuerza]:
+    bloque = _bloque(bloque_motor, "fuerza_minima_relativa", ruta)
+    pisos: dict[str, PisoDeFuerza] = {}
+    for clase in CLASES_DE_FUERZA:
+        prefijo = f"motor.fuerza_minima_relativa.{clase}"
+        datos = _bloque(bloque, clase, ruta)
+        medida = _presente(datos, "medida", ruta, prefijo)
+        if medida not in MEDIDAS_DE_FUERZA:
+            raise _error(
+                f"«{prefijo}.medida» debe ser una de {list(MEDIDAS_DE_FUERZA)}, "
+                f"no {medida!r}",
+                ruta,
+            )
+        pisos[clase] = PisoDeFuerza(
+            piso=_fraccion(datos, "piso", ruta, prefijo), medida=medida
+        )
+    return MappingProxyType(pisos)
 
 
 def _lista_de_textos(
@@ -301,11 +410,44 @@ def cargar(ruta: Path | str | None = None) -> Configuracion:
         ),
     )
 
+    # El bloque `motor` sigue siendo opcional, pero si viene se valida: un corte
+    # a cero o en texto haría que la vía de reglas puntuara mal en silencio, que
+    # es peor que no arrancar.
+    parametros_motor: ParametrosMotor | None = None
+    if "motor" in datos:
+        bloque_motor = _bloque(datos, "motor", ruta_final)
+        bloque_metodo = _bloque(bloque_motor, "definicion_metodo", ruta_final)
+        prefijo_metodo = "motor.definicion_metodo"
+        parametros_motor = ParametrosMotor(
+            tolerancia_banda_puntual_cm1=_numero_positivo(
+                bloque_motor, "tolerancia_banda_puntual_cm1", ruta_final, "motor"
+            ),
+            ancho_media_altura_umbral_cm1=_numero_positivo(
+                bloque_motor, "ancho_media_altura_umbral_cm1", ruta_final, "motor"
+            ),
+            ancho_pico_agudo_max_cm1=_numero_positivo(
+                bloque_motor, "ancho_pico_agudo_max_cm1", ruta_final, "motor"
+            ),
+            fuerza_minima_relativa=_pisos_de_fuerza(bloque_motor, ruta_final),
+            definicion_metodo=DefinicionMetodo(
+                fraccion_r1=_fraccion(
+                    bloque_metodo, "fraccion_r1", ruta_final, prefijo_metodo
+                ),
+                fraccion_r4=_fraccion(
+                    bloque_metodo, "fraccion_r4", ruta_final, prefijo_metodo
+                ),
+                margen_linea_base_cm1=_numero_positivo(
+                    bloque_metodo, "margen_linea_base_cm1", ruta_final, prefijo_metodo
+                ),
+            ),
+        )
+
     return Configuracion(
         archivo=parametros_archivo,
         validacion=parametros_validacion,
         procesamiento=parametros_procesamiento,
         ruta=ruta_final,
+        motor=parametros_motor,
     )
 
 

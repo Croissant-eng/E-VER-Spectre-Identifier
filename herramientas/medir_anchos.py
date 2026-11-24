@@ -41,6 +41,7 @@ from pathlib import Path
 
 from backend.preprocesamiento import procesar
 from backend.utilerias.catalogo import obtener as obtener_catalogo
+from backend.utilerias.configuracion import obtener as obtener_configuracion
 
 RAIZ = Path(__file__).resolve().parents[1]
 CARPETA_REFERENCIA = RAIZ / "datos" / "referencia"
@@ -50,10 +51,11 @@ CARPETA_REFERENCIA = RAIZ / "datos" / "referencia"
 CODIFICACION = "latin-1"
 
 #: Cuánto se extiende el vecindario a cada lado de la región para estimar la
-#: línea base local, en cm⁻¹. No es un rango espectral de ningún grupo: es un
-#: parámetro de esta medición. Lo bastante ancho para salir de la banda y lo
-#: bastante angosto para no cruzar media huella dactilar.
-MARGEN_CONTEXTO_CM1 = 200.0
+#: línea base local, en cm⁻¹: la definición del método de UT-03, la misma que
+#: usa el motor (T-15d). Si se separan, los cortes calibrados aquí dejan de
+#: significar lo que significan allá.
+_METODO = obtener_configuracion().motor.definicion_metodo
+MARGEN_CONTEXTO_CM1 = _METODO.margen_linea_base_cm1
 
 
 @dataclass(frozen=True)
@@ -165,7 +167,7 @@ def medir(archivo: str, compuesto: str, grupo: str) -> Medicion:
     linea_base = min(intensidad[i] for i in contexto)
 
     altura = intensidad[pico] - linea_base
-    nivel = linea_base + altura / 2
+    nivel = linea_base + altura * _METODO.fraccion_r1
 
     # El eje va de mayor a menor número de onda: índice que crece es onda que
     # baja. Hacia índices menores se sube en cm⁻¹.

@@ -7,7 +7,7 @@
 **Tareas del Plan V3:** T-14 … T-19 (más T-3R, de datos)
 **Hitos:** H8 → H9 → H10
 **Depende de:** Incremento 2 cerrado (H7) — MOD-04 entrega el espectro normalizado
-**Versión de este plan:** 2.0 (24/11/2026) · **Estado:** **D-12 a D-20 cerradas. Sin supuestos abiertos.** T-14 implementado y T-15a medido; los tres parámetros de UT-03 tienen valor aprobado. **Siguiente: T-15b**, la vía de reglas, que cierra H8. T-16 arranca en paralelo en cuanto T-3R entregue el conjunto.
+**Versión de este plan:** 2.5 (24/11/2026) · **Estado:** T-14, T-15a y T-15b implementados. **H8 sigue ABIERTO**: la vía de reglas funciona pero su puntaje solo acierta 1 de 8 conjuntos completos sobre espectros reales — ver **D-21**, que abre tres frentes. **D-12 opción B resuelta** (Chemotion IR, 4 183 espectros): T-16 ya no está bloqueado y debe arrancar **en paralelo**, sin esperar a que se cierre H8.
 
 *(Historial: 1.0 decisiones abiertas · 1.1–1.4 cierre de D-12 a D-18 y espectros elegidos · 1.5–1.6 D-19 y contrato de `/api/procesar` · 1.7 D-20 y corrección de la sección 4 · 1.8 `enlace_vibracion` y tercer parámetro · 1.9 medición de T-15a · 2.0 umbrales aprobados.)*
 
@@ -92,15 +92,40 @@ Aumentar es **fabricar variantes creíbles de un espectro que ya tienes, sin cam
 - **Para qué NO sirve, y es lo importante.** Multiplica copias, no química. Si en el conjunto hay cinco nitrilos, tendrás cinco nitrilos con ruido: el modelo sigue conociendo cinco moléculas. La aumentación arregla fragilidad, no falta de diversidad. Por eso **no sustituye a B**.
 - **La regla que la hace honesta.** Se aplica **solo al split de entrenamiento**, nunca a validación ni a prueba. Si una variante de un espectro de prueba se cuela en entrenamiento, el F1 que reporten será mentira y **nadie podrá notarlo desde fuera**.
 
-#### Sobre la opción B
+#### Opción B — RESUELTA el 24/11/2026: **Chemotion IR**
 
-Es la mejor salida **si** existe un conjunto con licencia compatible, porque resuelve de golpe el problema real, que es el tamaño. Pero sigue sin confirmarse que exista: no es una decisión, es una averiguación. Propuesta: **buscarlo con tiempo acotado y en paralelo, sin que bloquee**. T-14 y T-15 no necesitan dataset y pueden arrancar hoy. Si la búsqueda no da nada utilizable, se cae a A + C sin haber perdido tiempo de la ruta crítica.
+| | |
+|---|---|
+| **Qué es** | Colección de datos FT-IR del repositorio Chemotion (Karlsruhe Institute of Technology): espectros experimentales de compuestos caracterizados en laboratorios de síntesis, en su mayoría del KIT |
+| **Tamaño** | **4 183 archivos `.jdx`** + un `meta_data.json` |
+| **Etiquetas** | El metadato trae **`cano_smiles`** por espectro, además de `sample_id`, `kind`, `instrument`, `content` y `authors` |
+| **DOI** | `10.22000/OGoEQGlsZGElrgst` |
+| **Licencia** | **CC BY-SA 4.0** (atribución + compartir igual) |
+| **Cita exigida** | Jung, Nicole; Tremouilhac, Pierre; Punjabi, Dev; Huang, Pei-Chi (2024). *Chemotion repository — data collection: ft-ir spectroscopy data (chemotion ir)*. Karlsruhe Institute of Technology |
+
+**Por qué encaja tan bien, punto por punto:**
+
+- **Son espectros reales, no simulados.** Sin desfase de dominio contra los diez espectros de referencia.
+- **Vienen en JCAMP-DX**, que es justo lo que MOD-04 ya sabe leer. T-16b (paridad de preprocesamiento) se vuelve casi trivial: el mismo lector de producción procesa el conjunto de entrenamiento.
+- **Traen SMILES canónico**, que es literalmente el método de etiquetado que prescribe MOD-06 §7: derivar el vector binario de 7 posiciones de la estructura.
+- **Son datos de caracterización de laboratorio de síntesis**, que en la práctica se miden en fase condensada — coherente con la decisión de fase.
+
+**Referencia publicada, útil como contraste:** Punjabi *et al.*, *Journal of Cheminformatics* 17:24 (2025), acceso abierto CC BY 4.0, entrena una red con NIST SRD 35 más Chemotion y obtiene **F1 por encima de 0.7 para 17 grupos funcionales**. Sirve de vara: la puerta de D-13 (F1 ≥ 0.80 en tres grupos bien marcados, con solo siete clases) es ambiciosa pero no irreal. La mitad NIST de ese trabajo es **SRD 35, que es fase gas** — por eso no se adopta esa parte.
+
+**Cuatro cosas que hay que verificar antes de darlo por bueno (T-16a):**
+
+1. **La fase.** La ficha del conjunto **no describe el método de medición**. Hay que mirar `instrument` y `kind` en el metadato y confirmar que son medidas de fase condensada (ATR o película). Si hubiera una parte en gas, se excluye.
+2. **Cuántos sobreviven al pipeline.** Son espectros de laboratorios distintos con instrumentos distintos: habrá archivos que no cubran 1400–3700, que tengan menos de 300 puntos, o con `##YUNITS=` fuera de lo admitido (ya saben lo que eso significa). **Lo primero es pasar los 4 183 por MOD-03 + MOD-04 y contar cuántos pasan.** El propio artículo de Punjabi acaba trabajando con un subconjunto bastante menor que el total, así que esperen merma.
+3. **Cuántos positivos por grupo.** Un laboratorio de síntesis orgánica produce mucho C=O, aromático, C–H, O–H y N–H; **GF-04 (C≡N) y GF-06 (C=C) pueden seguir escasos** aun con 4 183 espectros. El conteo de support por clase de T-16a decide si el desbalance sigue siendo el problema.
+4. **La licencia, que es lo que más cuidado pide.** CC BY-SA 4.0 obliga a **atribuir** y a **compartir igual** las obras derivadas. No soy abogado y esto conviene que lo mire alguien del equipo o un profesor, pero lo prudente y además coherente con lo ya decidido es: **no redistribuir los espectros en el repositorio** (ya estaba decidido), **citar el conjunto** en el README y en el reporte de RNF-08, y **dejar anotada la licencia de origen** junto al archivo de pesos si se versiona. El riesgo real en un proyecto académico es bajo; el descuido de no citar, no.
+
+> **Y queda una lección registrada:** este conjunto existía desde 2024 y la búsqueda inicial del equipo no lo encontró porque se buscaba «dataset de espectros IR». Apareció al buscar por el **problema** —identificación de grupos funcionales con redes neuronales— y llegar al conjunto a través del artículo que lo usa. Para la siguiente búsqueda de datos, ese es el camino: buscar quién resolvió el problema y mirar con qué datos lo hizo.
 
 #### Cerrado el 23/11/2026 — el origen: A + B, con C como técnica de entrenamiento
 
-- **A** — núcleo curado a mano desde NIST WebBook (lista de abajo).
-- **B** — búsqueda de un conjunto publicado con licencia compatible, **a cargo del compañero**, en paralelo y sin bloquear a T-14 ni T-15.
-- **C** — aumentación, aplicada **solo al split de entrenamiento**.
+- **A** — núcleo curado a mano desde NIST WebBook (lista de abajo). **Se reserva para prueba y validación.**
+- **B** — conjunto publicado con licencia compatible. **Encontrado el 24/11/2026: Chemotion IR, 4 183 espectros reales con SMILES. Ver abajo.** Es el conjunto de **entrenamiento**.
+- **C** — aumentación, aplicada **solo al split de entrenamiento**. Con B resuelto pasa de ser necesaria a ser opcional: se usa si el support de GF-04 o GF-06 sigue bajo.
 
 #### Para qué se usa el núcleo curado (y para qué no)
 
@@ -381,7 +406,7 @@ El tamaño N se cierra en **D-19**.
 
 > **La decisión es una sola: el archivo del modelo entrenado, ¿lo subimos a GitHub o no?** Es una pregunta y no un trámite porque es un **binario que cambia entero en cada reentrenamiento**, y Git guarda todas las versiones para siempre: a los veinte entrenamientos el repositorio pesa veinte modelos aunque solo se use el último, y eso lo arrastra cualquiera que clone. Lo demás de esta sección no es decisión: es una aclaración para el agente de código.
 
-La decisión de persistencia v2 ya dice qué es: un **archivo de pesos de solo lectura** en `motor-identificacion/modelo/`, leído a través de UT-01, igual que el catálogo. Lo que falta es si entra a Git.
+La decisión de persistencia v2 ya dice qué es: un **archivo de pesos de solo lectura** en `motor_identificacion/modelo/`, leído a través de UT-01, igual que el catálogo. Lo que falta es si entra a Git.
 
 - **Durante la iteración:** fuera de Git (`.gitignore`). Un binario que cambia en cada entrenamiento infla el historial sin aportar nada.
 - **Para la entrega:** se versiona **un** archivo de pesos final, junto con el script de entrenamiento, la semilla y `split-prueba.txt`. Así la evaluación de RNF-08 es reproducible sin redistribuir el dataset.
@@ -486,6 +511,169 @@ Con el corte al 50 %, los dos archivos prescritos sugerían ~84 cm⁻¹ — y es
 
 ---
 
+### D-21 · Lo que T-15b encontró: el puntaje no separa, y por tres causas distintas
+
+T-15b implementó las cuatro reglas y todas las pruebas de comportamiento quedaron en verde. Pero sobre los ocho espectros reales el motor **acierta 45 de 56 decisiones por grupo y solo 1 de 8 conjuntos completos**. Los siete casos fallidos quedaron como `xfail(strict=True)`: cuentan como fallas y la suite se pondrá roja el día que el motor acierte, para que alguien venga a quitar la marca. Esa es la forma correcta de registrar un problema abierto.
+
+| Compuesto | GF-01 | GF-02 | GF-03 | GF-04 | GF-05 | GF-06 | GF-07 | Qué falla |
+|---|---|---|---|---|---|---|---|---|
+| ciclohexano | **0.84** | 0.20 | 1.00 | 0.59 | 0.24 | 0.20 | 0.00 | sobra GF-01 |
+| acetona | **0.74** | **0.93** | 0.85 | 0.19 | 1.00 | 0.33 | 0.00 | sobran GF-01, GF-02 |
+| ácido benzoico | **0.26** | 0.03 | 0.00 | 0.00 | 0.98 | **0.65** | 0.67 | **falta GF-01**, sobra GF-06 |
+| tolueno | 0.48 | 0.06 | 0.98 | 0.26 | **0.83** | **0.89** | 0.99 | sobran GF-05, GF-06 |
+| ciclohexeno | 0.50 | 0.55 | 1.00 | 0.23 | **0.84** | 0.96 | 0.00 | sobra GF-05 |
+| acetonitrilo | **0.92** | 0.33 | 0.99 | 1.00 | 0.51 | 0.01 | 0.00 | sobra GF-01 |
+| anilina | **0.87** | 0.94 | 0.22 | 0.04 | 0.52 | **0.86** | 0.89 | sobran GF-01, GF-06 |
+| 1-butanol | 0.99 | 0.42 | 0.99 | 0.12 | 0.43 | 0.57 | 0.00 | correcto |
+
+El agente diagnosticó **una** causa: falta una noción de fuerza absoluta. Es correcta y es la principal, pero la tabla muestra **tres problemas separados**, y conviene atacarlos por separado porque un solo parámetro no arregla los tres.
+
+**Causa A · No hay piso de fuerza absoluta → una región vacía puntúa alto.** Es la mayoría de los falsos positivos: GF-01 entre 0.74 y 0.92 en cuatro compuestos **que no tienen ningún O–H**, GF-02 en 0.93 sobre la acetona, GF-05 en 0.83 y 0.84 sobre tolueno y ciclohexeno. El puntaje mide la fuerza de una banda **relativa al desorden del propio espectro**, así que en una región donde solo hay línea base, cualquier ondulación se vuelve «la banda más notable de por aquí». El agente probó las dos escalas posibles sin inventar parámetros (por ruido: 36/56; por prominencia típica: 45/56) y ninguna sirve sola — correcto, el problema no es de escala sino de que **falta un umbral de existencia**.
+
+**Causa B · ~~La ventana de línea base es más angosta que las bandas que tiene que medir.~~ REFUTADA el 24/11/2026 por T-15c.** La hipótesis era que `MARGEN_LINEA_BASE_CM1 = 200` quedaba dentro de una banda de 409 cm⁻¹ y la aplanaba. **Es falsa, por dos motivos medidos:** la ventana efectiva de GF-01 ya era de ±550, porque el margen **se suma a la región ya ensanchada**; y el barrido de márgenes (200 → 3600) sube el ácido benzoico de 0.262 a 0.609 pero sube también a los tres falsos positivos, de modo que los aciertos **bajan** de 45 a 43–44. Ningún margen sirve, y escalarlo con el ancho de la región tampoco. **El margen se queda en 200** — y no debe bajar de 100, porque entonces el hombro del ácido benzoico mediría 74–88 y pasaría R-4.
+
+**La causa real del único falso negativo es otra, y es una decisión nuestra:** el O–H del ácido benzoico **no está en 3200–3550** (la intensidad media ahí es 0.04–0.05). Está en **2500–3200**, que el catálogo declara como región `indicio` — y D-20.4 decidió que un `indicio` **no condiciona la detección**. Al no condicionar, tampoco suma: el O–H más seguro del conjunto vive en una región que el puntaje ignora por diseño. Ver D-22.
+
+**Causa C · ~~R-2 no separa GF-06 de GF-07.~~ REUBICADA el 24/11/2026 por T-15c.** El traslape entre el =C–H del alqueno (3020–3100) y el C–H aromático (3000–3100) **existe y sigue siendo un defecto del plan**, pero **no es lo que produce los tres falsos positivos**. T-15c fue a ver qué pico los gana, y los tres vienen de **fuera de la región de GF-06**: en el ácido benzoico es su propio **C=O en 1684** (4 cm⁻¹ por encima de 1680); en tolueno y anilina es el **anillo, en 1614 y 1618** (6 y 2 cm⁻¹ por debajo de 1620).
+
+No es un problema de reglas de desempate: **es que la búsqueda de picos se sale de la región y acredita al grupo vecino un pico que pertenece a otro**. Por eso **no se añade ninguna regla a R-2 todavía** — primero se corrige la búsqueda. La corrección de R-2 que está anotada en la sección 6 sigue pendiente como defecto real, pero deja de ser urgente.
+
+#### Qué se aprueba
+
+**1. La calibración de fuerza absoluta (causa A) — aprobada, y se mide, no se inventa.** Clave nueva en el bloque `motor`, alimentada por el campo `intensidad` que el catálogo ya tiene:
+
+```
+fuerza_minima_relativa: { fuerte: …, media: …, debil: … }
+```
+
+como fracción de la banda más intensa del espectro. Como MOD-04 ya normaliza a 0–1, esa fracción es directamente el valor en la escala normalizada. **Se mide con el mismo método de T-15a**, sobre los espectros de referencia, y el equipo ve los números antes de que se escriban. Es el patrón que funcionó con 175 y 160.
+
+**2. Los tres números de definición se mueven a UT-03 (causa B, y regla 1).** `FRACCION_R1 = 0.5`, `FRACCION_R4 = 0.8` y `MARGEN_LINEA_BASE_CM1 = 200` pasan al bloque `motor`, agrupados bajo una subclave que los marque como **definición del método, no como ajuste**. El propio agente dio el argumento decisivo: si el margen cambia, 175 y 160 **dejan de significar lo que significan**. Separar un umbral de su definición es la receta para que alguien cambie uno sin el otro. Juntos y en el mismo archivo, el acoplamiento se ve.
+
+Y el margen **va a cambiar**: 200 no puede medir una banda de 409. Debe **escalar con el ancho declarado de la banda** en vez de ser un número fijo — o como mínimo ser bastante mayor que la banda más ancha del catálogo.
+
+**3. R-2 se corrige (causa C).** Ver la sección 6.
+
+#### Qué NO se hace
+
+**No se mueve ningún umbral para que pase una prueba.** Los siete `xfail` se quitan cuando el motor acierte, no cuando el umbral ceda.
+
+> **Corrección del 24/11/2026.** Este párrafo decía antes que «el 1-butanol pasó R-4 con 0.99 y el corte de 160 no se tocó». **Era falso, y el error es de este documento:** T-15c comprobó que el detector de envolvente mide el C–H del butanol en 163 —por debajo de 175— y concluye que no hay envolvente, de modo que **R-4 nunca llegó a aplicarse**. El caso apretado no se probó: no hay ninguna prueba hoy que lo compruebe. Su pico principal mide 119.5 al 80 %, así que *debería* pasar el corte, pero eso hay que verificarlo, no suponerlo. Se arregla en T-15d.
+
+#### La verdad de referencia: 56 celdas
+
+Hasta ahora esta tabla vivía repartida entre las filas de la sección 9. Se consolida aquí porque es contra lo que se mide todo: qué grupos tiene **de verdad** cada uno de los ocho espectros, por química, no por lo que diga el motor.
+
+| Compuesto | GF-01 | GF-02 | GF-03 | GF-04 | GF-05 | GF-06 | GF-07 |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| ciclohexano | — | — | **Sí** | — | — | — | — |
+| acetona | — | — | **Sí** | — | **Sí** | — | — |
+| ácido benzoico | **Sí** | — | — | — | **Sí** | — | **Sí** |
+| tolueno | — | — | **Sí** | — | — | — | **Sí** |
+| ciclohexeno | — | — | **Sí** | — | — | **Sí** | — |
+| acetonitrilo | — | — | **Sí** | **Sí** | — | — | — |
+| anilina | — | **Sí** | — | — | — | — | **Sí** |
+| 1-butanol | **Sí** | — | **Sí** | — | — | — | — |
+
+Dos filas merecen una nota porque son contraintuitivas y son justo las que hacen trabajar a las reglas: **el ácido benzoico no tiene C–H alifático** (no hay carbonos sp³ en C₆H₅–COOH) y **la anilina tampoco** (C₆H₅–NH₂). Son los dos casos de R-4 y del negativo cruzado.
+
+#### Secuencia para cerrarlo: T-15c mide, T-15d aplica
+
+Igual que T-15a y T-15b: **nadie toca el puntaje hasta que los números estén sobre la mesa y aprobados.**
+
+- **T-15c — medición, sin cambiar comportamiento.** Mueve los tres números de definición a UT-03 con sus valores actuales (cambio mecánico), comprueba la hipótesis de la causa B barriendo el margen de línea base, y mide la fuerza de la banda de cada grupo en cada uno de los ocho espectros, separando presentes de ausentes contra la tabla de arriba. Reporta y propone.
+- **T-15d — aplicación, tras aprobación.** Escribe el margen nuevo y los pisos de fuerza, vuelve a correr las 56 celdas y mira si la causa C se disuelve sola. Solo entonces se decide si R-2 necesita una regla más.
+
+> **Un límite del calibrado que conviene saber de antemano:** el catálogo declara `fuerte` solo para GF-01 y GF-05, `media` para GF-02, GF-03, GF-04 y GF-07, y `media / débil` únicamente para GF-06. Es decir, **el piso de la clase débil se va a calibrar con un solo grupo y un solo espectro verdadero (el ciclohexeno)**. Se usa igual, pero se documenta: es el número menos sostenido de los tres.
+
+---
+
+### D-22 · Lo que T-15c midió, y las siete decisiones que cierra
+
+**El aviso que va primero, porque condiciona todo lo demás.** El propio agente lo escribió: *«todos salen de los mismos 8 espectros con que se evalúan, así que el 54/56 es optimista»*. Tiene razón y hay que tomarlo en serio: **los pisos se están calibrando sobre el mismo conjunto contra el que se mide el acierto.** Eso no es una medida de exactitud, es una medida de ajuste. Dos consecuencias:
+
+1. **Los ocho espectros de referencia quedan quemados como calibración de la vía de reglas.** Ya no son una prueba independiente de ella. Siguen sirviendo como pruebas de regresión —detectan si algo se rompe— pero no dicen cuánto acierta el motor en un espectro que no ha visto.
+2. **Cuando Chemotion esté procesado (T-16a), la vía de reglas también necesita su evaluación en datos reservados**, no solo el CNN. Hoy su exactitud fuera de muestra es sencillamente desconocida, y conviene decirlo así en el reporte de RNF-08 en vez de citar el 54/56.
+
+#### Las decisiones
+
+| # | Pregunta | Resolución |
+|---|---|---|
+| 1 | ¿El margen se queda en 200? | **Sí, y la causa B se cierra como refutada.** El barrido lo demuestra y bajar de 100 rompería R-4 |
+| 2 | ¿El `indicio` puede sumar a GF-01 sin penalizar cuando falta? | **Sí — y es un matiz a D-20.4 que corrige una decisión mía.** Ver abajo |
+| 3 | Pisos de fuerza | **fuerte 0.10** (condicionado a que la 2 funcione), **media 0.025**, **débil por prominencia 0.029** |
+| 4 | ¿Se limita la búsqueda de picos fuera de región? | **Sí, por la vía que propone el agente:** exigir que el piso se cumpla **dentro** de la región. Prohibir del todo rompería el GF-03 de la acetona |
+| 5 | ¿R-1 mide el ancho en la banda más prominente de la región? | **Sí.** Es lo único que arregla anilina/GF-01 |
+| 6 | ¿Se arregla el detector de envolvente de R-4 y la prueba vacía? | **Sí, en T-15d.** Las dos afirmaban algo que no era |
+| 7 | ¿Vale la prueba de no-hardcodeo por AST? | **Sí, pero con la cobertura restaurada.** Ver abajo |
+
+**Sobre la 2 — el matiz a D-20.4.** D-20.4 aprobó que la banda de ácidos de GF-01 fuera `indicio` y no `confirmacion`, con este razonamiento: si condicionara la detección, **los alcoholes y fenoles quedarían penalizados por no tener la banda de ácido**. Ese razonamiento sigue siendo correcto. Lo que estaba mal era la implicación: se confundió **«no debe ser exigida»** con **«no debe sumar»**.
+
+> **`indicio` pasa a significar evidencia aditiva: suma cuando está, es neutra cuando falta.** Asimétrica a propósito. El alcohol no pierde nada por no tener banda de ácido; el ácido gana lo que le corresponde por tenerla. Sin esto **no se cumple CA-05.2**, que exige que el ácido benzoico liste O–H.
+
+La medida que lo respalda: la mediana de la intensidad en 2500–3300 separa los presentes (0.399 y 0.171) de los ausentes (≤ 0.029), un factor 5.9. **Solo hay dos presentes**, así que el número es frágil y se revisa con Chemotion.
+
+**Sobre la 3 — y una precedencia que vale la pena fijar.** D-21 decía que los pisos se medirían **por altura**. La medición mostró que para la clase débil la altura **no separa** (presentes 0.0838, ausentes hasta 0.6734) y la **prominencia sí** (presentes 0.0766, ausentes ≤ 0.0112, quita 3 de 3). Se adopta la prominencia. **Cuando la medición contradice al plan, manda la medición** — y el plan se corrige, que es lo que está pasando aquí.
+
+Firmeza de cada piso, para que nadie los cite como si fueran sólidos: el de la clase **débil** sale de **un solo dato**; el de **media** descansa en un solo contraste dentro de la acetona; el de **fuerte** se apoyaba en un 0.0748 que es *una ladera en 3201, no una banda* — por eso sube a 0.10 si la decisión 2 resuelve el ácido benzoico por la vía del indicio. Y la clase **media** tiene los rangos de presentes y ausentes **completamente solapados** (ambos llegan a 1.0): su piso de 0.025 es casi inerte y no debe esperarse mucho de él.
+
+**Sobre la 7.** La prueba por AST es mejor que la original, porque distingue un número usado de uno citado en un docstring. Pero el agente **sacó `motor_identificacion/` de la cobertura sin avisar**, y esa cobertura estaba pedida expresamente. Se queda la prueba por AST **y** se restaura la cobertura del motor: las dos cosas, no una u otra. El punto de proceso importa más que el técnico — **quitar una verificación que se pidió se avisa antes, no después**.
+
+#### Correcciones al registro
+
+T-15c revisó su propio reporte anterior y corrigió cinco afirmaciones. Dos tienen consecuencias que van más allá de T-15b:
+
+- **La prueba de que «el score cae con la debilidad» era vacía:** un pico aislado de 1.0 y uno de 0.001 dan ambos 1.0. No es solo una prueba mal hecha — **es la causa A enunciada de otra forma**, y estaba delante desde el principio.
+- **La penalización suave de R-4 sí bastaba.** D-20.6 aprobó hacer R-4 binaria porque la penalización suave dejaba al ácido benzoico en 0.67; la cifra real es **0.57**, por debajo del umbral. La decisión de que sea binaria **se mantiene** por coherencia con cómo funciona una confirmación ausente, pero **la razón que se dio era falsa** y queda corregida aquí.
+
+También: el vecindario con el que el motor mide no era el mismo de T-15a, y D-21 heredó ese error. El efecto en los anchos es pequeño (118.3 → 119.5 y 216.5 → 230.9) y no cambia ninguna conclusión sobre 175 y 160, pero el acoplamiento se arregla en T-15d.
+
+---
+
+### D-23 · T-15d: 56/56, y lo que ese número no dice
+
+Las siete decisiones se aplicaron **sin mover ningún umbral ni piso**, y el motor pasó de 45/56 a **56/56 celdas y 8/8 conjuntos**. El reparto del mérito, que es lo que pedía la tarea por fases:
+
+| Paso | Aciertos | Conjuntos | Qué arregló |
+|---|---|---|---|
+| Fase 1 (correcciones) | 45 | 1 | Ninguna celda cambia de veredicto |
+| 5 · `indicio` aditivo | 46 | 1 | Ácido benzoico/GF-01: 0.26 → 0.90 |
+| 6 · pisos de fuerza | 55 | 7 | 9 falsos positivos, **incluidos los tres GF-06** |
+| 7 · R-1 en la banda prominente | **56** | **8** | Anilina/GF-01: 0.85 → 0.37 |
+
+El paso 6 confirmó la reubicación de la causa C: **los tres GF-06 espurios cayeron con el piso dentro de la región, sin añadir ninguna regla a R-2.** Margen final: el presente más bajo es 0.67 y el ausente más alto 0.43, con el umbral en 0.60.
+
+#### Tres reservas sobre ese 56/56
+
+**1. Se midió sobre los mismos ocho espectros que calibraron los pisos.** Ya estaba dicho en D-22 y sigue valiendo: es una medida de ajuste, no de exactitud. **No se presenta como validación en ningún entregable.** El único dato fuera de muestra es el benzonitrilo —convertido a cm⁻¹ en memoria, da exactamente GF-04 y GF-07—, y es **un** espectro.
+
+**2. El puntaje usa el resto del espectro como referencia de ruido, y eso no escala.** T-15d lo midió: en un espectro de dos bandas, **una banda ajena baja un O–H de 1.00 a 0.54**. No ocurre en los ocho reales porque son moléculas simples con pocas bandas. **Los compuestos de Chemotion no lo son**: son productos de síntesis con espectros densos. Es la hipótesis que más probablemente falle al salir de estos ocho, y conviene comprobarla en cuanto T-16a tenga el conjunto procesado — no esperar a que aparezca como un F1 bajo sin explicación.
+
+**3. Bajo el piso, el score cae a 0 de golpe, no decae.** MOD-06 §6 dice que el score «disminuye con la distancia al rango y la debilidad del pico». Con los pisos, por debajo del umbral de existencia el score es **0**, no un valor pequeño. Es defendible —por debajo del piso no hay banda que puntuar— pero **es un refinamiento de §6, no una implementación de §6**, y queda registrado como tal. Dos pruebas se ajustaron para reflejarlo; están nombradas en la evidencia.
+
+#### Decisiones aprobadas
+
+| # | Qué | Resolución |
+|---|---|---|
+| 1 | R-4 se mide en la cima de la región | **Sí.** Unificar el vecindario rompía el ácido benzoico (un pico en 2835 pasaba de 219.9 a 90.4 y GF-03 subía a 0.79). **Medir donde se calibró** es el principio correcto |
+| 2 | El piso del `indicio` se exige a la zona que da la evidencia | **Sí.** La evidencia está en la región de ácido (mediana 0.171); exigirlo en la principal (0.0748) anularía el grupo y daría 55/56 |
+| 3 | El `indicio` activa con banda ancha y suma sin señalar pico | **Sí**, con una limitación anotada: **un ácido con C–H alifático intenso podría no activarlo**. Hay que probarlo con un ácido de cadena alifática —`acetic acid`, de la prioridad 2— antes de darlo por bueno |
+| 4 | La envolvente de R-4 también exige el piso fuerte | **Sí.** Sin él, ondulaciones de línea base contaban como O–H |
+| 5 | Bajo el piso, score 0 | **Sí**, documentado como refinamiento de §6 (reserva 3) |
+| 6 | `.gitignore` apunta a `motor-identificacion/modelo/*` con guion | **Arréglalo ya, antes de T-16.** Hoy **los pesos del modelo se commitearían**, contra lo que decidió D-18 |
+
+#### CA-06.2 no se cumple — y va a T-15e, en paralelo con T-16
+
+Con O–H y N–H a la vez, **se suprimen entre sí**: GF-02 queda en 0.44–0.59 en mezclas reales, y en sintéticos un N–H fuerte deja al O–H en 0.12–0.15. El paso 7 **empeoró un caso** (0.87 → 0.12): R-1, al medir la banda más prominente de la región, se volvió estructuralmente de ganador único justo en el traslape — exactamente lo que la sección 6 prohíbe («ajuste de score, nunca exclusión»). Parte del 56/56 se compró con esto.
+
+**CA-06.2 es criterio del incremento 4, pero su precondición es de MOD-06:** si el motor no reporta los dos grupos, MOD-05 no tiene qué resaltar y el criterio es inalcanzable. Como **T-16 no depende de T-15 en absoluto**, no hay razón para diferirlo: **T-15e corre en paralelo con T-16a**, con otra persona.
+
+**H8: CERRADO** el 24/11/2026. Su criterio se cumple (acetona → GF-05 = 1.00, pico en 1719.6 dentro de su región) y los ocho espectros cuadran. Se cierra **con CA-06.2 anotado como pendiente** y sin presentar el 56/56 como validación: eso lo dirá RNF-08.
+
+> **Fallo de proceso que hay que corregir antes de seguir.** El agente trabajó T-15c con el plan v2.2 en disco y T-15d también, tomando los valores del chat porque **el plan actualizado nunca se subió al repositorio**. Funcionó por poco y porque alguien iba pasando los números a mano. Es exactamente lo que la regla de oro del proyecto prohíbe: las decisiones viven en los documentos, no en el chat. **Antes de abrir cualquier conversación nueva, la v2.4 tiene que estar en `docs/plan/` y reemplazada en el Proyecto.**
+
+---
+
 ## 2. Alcance y fronteras del incremento 3
 
 **Dentro:**
@@ -518,9 +706,9 @@ Con el corte al 50 %, los dos archivos prescritos sugerían ~84 cm⁻¹ — y es
 | **UT-01 · Catálogo** | `datos/catalogo/grupos.json` + su lector de solo lectura | — | MOD-06 (y MOD-07, MOD-08 después) | T-14 |
 | **UT-03 · Configuración** (se amplía) | `backend/utilerias/configuracion` | — | MOD-06 | T-15 / T-17 |
 | **UT-02 · Mensajes** (se amplía) | `backend/utilerias/mensajes` | — | MOD-06, MOD-01 | T-19 |
-| **MOD-06 · reglas** | `motor-identificacion/reglas` | T-10 (vector), UT-01 | fusión | T-15 |
-| **MOD-06 · modelo** | `motor-identificacion/modelo` | T-10, UT-01 (orden de etiquetas) | fusión | T-16 |
-| **MOD-06 · inferencia** | `motor-identificacion/inferencia` | reglas + modelo + UT-03 | MOD-01, y MOD-07 después | T-17 |
+| **MOD-06 · reglas** | `motor_identificacion/reglas` | T-10 (vector), UT-01 | fusión | T-15 |
+| **MOD-06 · modelo** | `motor_identificacion/modelo` | T-10, UT-01 (orden de etiquetas) | fusión | T-16 |
+| **MOD-06 · inferencia** | `motor_identificacion/inferencia` | reglas + modelo + UT-03 | MOD-01, y MOD-07 después | T-17 |
 | **Entrenamiento** (fuera de la app) | `herramientas/entrenamiento/` | MOD-04 (normalización), dataset | el archivo de pesos | T-16 |
 | **MOD-01 · interfaz** (se amplía) | `frontend/interfaz`, `frontend/servicios` | contrato de MOD-06 | usuario | T-18, T-19 |
 
@@ -628,6 +816,16 @@ El riesgo n.º 6 de Requerimientos §13 está **abierto**: el traslape O–H / N
 - GF-06 exige su **=C–H en 3020–3100**.
 - Si la banda acompañante no está, el score se **acota por debajo del umbral** en vez de reportar el grupo.
 
+> **Corrección del 24/11/2026 (defecto de este plan, detectado por los datos de T-15b).** Tal como estaba escrita, **R-2 no separa GF-06 de GF-07**: el =C–H del alqueno (3020–3100) y el C–H aromático (3000–3100) **se solapan casi por completo**, así que cualquier aromático satisface la confirmación del alqueno. Resultado real: GF-06 en 0.65, 0.89 y 0.86 sobre ácido benzoico, tolueno y anilina, que no tienen C=C de alqueno. R-2 sí protege a GF-07, porque a ese le exige el **par** completo además del C–H; el desprotegido es GF-06.
+>
+> **La banda compartida no puede ser el discriminante.** Tres salidas, a decidir por el equipo:
+>
+> 1. **Condicionar GF-06 a GF-07** — si GF-07 está presente con fuerza, la señal aparente de GF-06 en 1620–1680 se atribuye preferentemente al anillo y su score se acota. Barato y resuelve los tres casos de la tabla. **Riesgo:** un compuesto que tenga los dos de verdad —el caso del estireno— quedaría subestimado. Como el estireno se descartó por unidades, hoy **no hay ningún espectro en el conjunto que tenga ambos**, así que esta regla no se puede validar en las dos direcciones. Eso, por sí solo, es un argumento para conseguir ese archivo.
+> 2. **Exigir a GF-06 fuerza absoluta en su región principal**, no solo la acompañante — es decir, dejar que la causa A haga el trabajo. Si las bandas de 1620–1680 en tolueno y anilina son débiles en términos absolutos, el piso de fuerza las elimina sin necesidad de una regla nueva. **Es la opción más limpia si funciona**, y se sabrá al medir `fuerza_minima_relativa`.
+> 3. **Aceptar el traslape y documentarlo** como limitación: GF-06 es uno de los dos grupos que el diseño ya anticipa con F1 bajo (MOD-06 §8).
+>
+> **Recomendación: medir primero la causa A y volver a mirar la tabla.** Si la opción 2 basta, no se añade ninguna regla; si no basta, se discute la 1 con un espectro que tenga ambos grupos para poder validarla.
+
 **R-3 · La contaminación de CCl₄ de la acetona — la trampa ya documentada, convertida en prueba.** El archivo real de acetona declara `$$SPECTRAL CONTAMINATION DUE TO CCl4 AROUND 1550`. Esos 1550 cm⁻¹ caen dentro de 1450–1600, que es **GF-07**, y la acetona **no tiene anillo aromático**. Un «pico dentro del rango» ingenuo reporta un aromático inexistente.
 
 > Con R-2 no debería pasar: no hay par de bandas ni C–H aromático. Por eso se añade una prueba de regresión: **acetona → GF-05 detectado y GF-07 NO detectado.** CA-05.1 no lo exige (solo pide detectar C=O), así que es una prueba **añadida**; vale la pena porque convierte un hallazgo que ya costó encontrar en una red de seguridad permanente.
@@ -658,7 +856,7 @@ T-14 (catálogo) ──┬──► T-15 (reglas) ──────────
 
 | Hito | Se cierra cuando | Evidencia |
 |---|---|---|
-| **H8** | UT-01 entrega los 7 grupos y la vía de reglas detecta C=O con su región en la acetona | Catálogo + prueba de cobertura + resultado de reglas sobre espectros reales y sintéticos |
+| **H8** | UT-01 entrega los 7 grupos y la vía de reglas detecta C=O con su región en la acetona | Catálogo + prueba de cobertura + resultado de reglas sobre espectros reales y sintéticos · **24/11/2026: ABIERTO.** Su criterio literal se cumple (acetona → GF-05 = 1.00, pico en 1719.6 dentro de 1670–1780), pero su evidencia pide el resultado sobre espectros reales y ese resultado es 1 de 8. El plan apuesta a que una vía de reglas sólida convierte el plan B en opción viable; con 1 de 8 todavía no lo es. Se cierra al resolver D-21 |
 | **H9** | La vía ML tiene métricas sobre el conjunto de prueba independiente **y** la fusión con umbral funciona (CA-05.3) | Tablas de RNF-08 (las dos de D-13) + pruebas de umbral con confianzas simuladas |
 | **H10** | MOD-01 muestra la lista con su confianza y el aviso / el fallo; **el incremento 3 es demostrable** | CA-05.1, 05.2, 05.4, CA-08.1–08.3 + medición de RNF-02 |
 
@@ -709,7 +907,7 @@ El Plan V3 asigna los responsables de los incrementos 2 a 5 **al arrancar cada u
 - **Pruebas:** cobertura — los 7 grupos existen y ninguno le falta región ni rasgo. Prueba de no-«hardcodeo»: ningún número de región aparece fuera del catálogo.
 - **Fronteras:** **sin textos de explicación** (son T-20, incremento 4). El catálogo es datos, no lógica: no decide nada.
 
-### T-15 · Vía de reglas — `motor-identificacion/reglas`
+### T-15 · Vía de reglas — `motor_identificacion/reglas`
 
 - **Objetivo:** detectar picos y compararlos con el catálogo; devolver un score en [0, 1] por grupo, **con su región y su pico**.
 - **Insumos:** vector normalizado de T-10, catálogo de T-14, reglas R-1 a R-4 de la sección 6.
@@ -718,7 +916,7 @@ El Plan V3 asigna los responsables de los incrementos 2 a 5 **al arrancar cada u
 - **Pruebas:** espectros sintéticos (un pico en 1715 → GF-05 con su región; sin picos → nada); la acetona real → GF-05 sí, GF-07 no (R-3); el ácido benzoico real → O–H, C=O y aromático, y GF-03 no (R-4); el ciclohexeno → GF-06 (banda débil); el benzonitrilo → GF-04 y GF-07.
 - **Fronteras:** cero aprendizaje automático aquí; cero texto de explicación; no toca UT-03 más allá de leer lo que necesite. Debe ser **determinista**: la misma entrada da el mismo score siempre.
 
-### T-16 · Vía ML (CNN 1D multi-etiqueta) — `motor-identificacion/modelo` + `herramientas/entrenamiento/`
+### T-16 · Vía ML (CNN 1D multi-etiqueta) — `motor_identificacion/modelo` + `herramientas/entrenamiento/`
 
 La tarea más pesada del proyecto. Se parte en cuatro para que tenga hitos propios y no sea un bloque opaco de semanas (refinamiento autorizado por el Plan V3; no cambia su alcance ni su ID).
 
@@ -726,11 +924,11 @@ La tarea más pesada del proyecto. Se parte en cuatro para que tenga hitos propi
 
 **T-16b · Paridad de preprocesamiento.** Objetivo: el entrenamiento usa **la normalización real de MOD-04**, no una copia. Terminado: una prueba demuestra que un espectro procesado por la ruta de entrenamiento y por la ruta de producción da el **mismo vector**. Es la prueba que previene el riesgo «consistencia MOD-04 ↔ MOD-06» de MOD-06 §11. Bloqueada por el valor real de N (D-17).
 
-**T-16c · Entrenamiento.** Insumos: T-16a, T-16b, UT-01 (orden de etiquetas). Terminado: salida sigmoide de 7 probabilidades independientes (multi-etiqueta, no multi-clase); **semilla fija** y registrada; el desbalance de clases atendido explícitamente (ponderación por clase o, como mínimo, reportado con su support); el archivo de pesos en `motor-identificacion/modelo/` según D-18. Fronteras: la arquitectura concreta la decide quien implemente **dentro de este contrato**; lo que el plan fija es la entrada, la salida, la semilla, el split y las métricas. No se toca `split-prueba.txt`.
+**T-16c · Entrenamiento.** Insumos: T-16a, T-16b, UT-01 (orden de etiquetas). Terminado: salida sigmoide de 7 probabilidades independientes (multi-etiqueta, no multi-clase); **semilla fija** y registrada; el desbalance de clases atendido explícitamente (ponderación por clase o, como mínimo, reportado con su support); el archivo de pesos en `motor_identificacion/modelo/` según D-18. Fronteras: la arquitectura concreta la decide quien implemente **dentro de este contrato**; lo que el plan fija es la entrada, la salida, la semilla, el split y las métricas. No se toca `split-prueba.txt`.
 
 **T-16d · Evaluación (RNF-08).** Terminado: las **dos** tablas de D-13 — la vía ML sola (sigmoide en 0.5) y el motor completo (post-fusión, umbral 60 %) — con precisión, recall, F1 y support de los siete grupos, macro-F1 y matriz de confusión uno-contra-resto, sobre el subconjunto de prueba independiente. Evidencia en `docs/evidencia/rnf-08.md`, con la semilla y la suma de verificación del split. Si un grupo de la puerta falla, se escribe y se escala a D-16. **El subconjunto de prueba se usa una sola vez.**
 
-### T-17 · Fusión y umbral — `motor-identificacion/inferencia`
+### T-17 · Fusión y umbral — `motor_identificacion/inferencia`
 
 - **Objetivo:** `conf = wR·score_regla + wML·prob_ml` y aplicar el umbral.
 - **Insumos:** T-15, T-16, umbral y pesos de UT-03 (D-15).
@@ -795,7 +993,7 @@ Alineado con la decisión de persistencia v2: **sin base de datos**, archivos de
 | Qué | Dónde | Quién lo lee | ¿Al repositorio? |
 |---|---|---|---|
 | Catálogo de los 7 grupos | `datos/catalogo/grupos.json` | UT-01 → MOD-06 (y MOD-07, MOD-08) | **Sí** |
-| Modelo entrenado (pesos) | `motor-identificacion/modelo/` | UT-01, al arrancar | Según D-18: fuera durante la iteración, uno final para la entrega |
+| Modelo entrenado (pesos) | `motor_identificacion/modelo/` | UT-01, al arrancar | Según D-18: fuera durante la iteración, uno final para la entrega |
 | Índice del dataset y split de prueba | `datos/dataset/indice.csv`, `split-prueba.txt` | el script de entrenamiento | **Sí** (hace auditable RNF-08) |
 | Los espectros del dataset | fuera del repositorio | el script de entrenamiento | **No** (licencia y tamaño) |
 | Espectros de referencia de las pruebas | `datos/referencia/` | las pruebas | **Sí**, con su nota de origen y términos revisados |
@@ -869,6 +1067,8 @@ Los del Plan V3 Paso 8 para este incremento, más los que aparecen al detallarlo
 
 - NIST Chemistry WebBook (`webbook.nist.gov`) — identificadores de especie verificados: benzonitrilo `C100470` (100-47-0), ciclohexeno `C110838` (110-83-8), estireno `C100425` (100-42-5), tolueno `C108883` (108-88-3), **ciclohexano `C110827` (110-82-7 — compuesto distinto del ciclohexeno)**, fenol `C108952` (108-95-2), acetonitrilo `C75058` (75-05-8), 1-hexeno `C592416` (592-41-6), acetato de etilo `C141786` (141-78-6), ciclohexanol `C108930`, acetato de butilo `C123864`. La fase del espectro **no** aparece en la página de especie: hay que verla al abrir el espectro, donde además se elige entre varias entradas (líquido neto, disolución, gas). Las páginas llevan la nota de *data compilation copyright* del U.S. Secretary of Commerce.
 - Los rangos de los 7 grupos provienen de Requerimientos V3.2 §6.2 y de MOD-06 §4, que a su vez citan la tabla de absorciones IR de la University of Colorado Boulder y LibreTexts.
+- **Conjunto de entrenamiento (D-12, opción B):** Jung, N.; Tremouilhac, P.; Punjabi, D.; Huang, P.-C. (2024). *Chemotion repository — data collection: ft-ir spectroscopy data (chemotion ir)*. Karlsruhe Institute of Technology. DOI `10.22000/OGoEQGlsZGElrgst`. Licencia **CC BY-SA 4.0**. 4 183 espectros `.jdx` con `cano_smiles` en el metadato.
+- **Referencia metodológica:** Punjabi, D. *et al.* (2025). «Infrared spectrum analysis of organic molecules with neural networks using standard reference data sets in combination with real-world data». *Journal of Cheminformatics* 17:24. Acceso abierto CC BY 4.0. F1 > 0.7 para 17 grupos funcionales con NIST SRD 35 + Chemotion.
 
 ---
 
