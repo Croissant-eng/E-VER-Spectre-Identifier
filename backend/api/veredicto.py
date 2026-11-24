@@ -95,3 +95,47 @@ def rechazado(
         "mensaje": mensaje.texto,
         "accion": mensaje.accion,
     }
+
+
+#: Decimales con que viajan la confianza y las evidencias del análisis.
+DECIMALES_CONFIANZA: int = 4
+
+
+def _redondeado(valor: float | None) -> float | None:
+    return None if valor is None else round(valor, DECIMALES_CONFIANZA)
+
+
+def analizado(
+    resultado: Any, catalogo: Any, configuracion: Configuracion | None = None
+) -> dict[str, Any]:
+    """El cuerpo de POST /api/analizar (incremento 3).
+
+    Es la salida de MOD-06 de su diseño (sección 5) más dos cosas que la
+    página necesita para mostrarla: el nombre de cada grupo, que sale de
+    UT-01, y el aviso de UT-02 cuando no hubo detecciones (CA-08). El aviso
+    viaja dentro del resultado con valido en True porque no es un error: el
+    sistema analizó y está siendo honesto.
+
+    Args:
+        resultado: el ResultadoMotor de la fusión (T-17).
+        catalogo: el de UT-01, para los nombres.
+        configuracion: la de UT-03, para que el aviso nombre el umbral.
+    """
+    contrato = resultado.como_contrato()
+    for deteccion in contrato["detecciones"]:
+        deteccion["nombre"] = catalogo.por_id(deteccion["grupo"]).nombre
+        deteccion["confianza"] = _redondeado(deteccion["confianza"])
+        deteccion["evidencia"] = {
+            clave: _redondeado(valor) for clave, valor in deteccion["evidencia"].items()
+        }
+
+    cuerpo: dict[str, Any] = {"valido": True, **contrato}
+    if resultado.sin_detecciones:
+        mensaje = mensajes.obtener(mensajes.SIN_DETECCIONES, configuracion)
+        cuerpo["aviso"] = {
+            "codigo": mensaje.codigo,
+            "titulo": mensaje.titulo,
+            "mensaje": mensaje.texto,
+            "accion": mensaje.accion,
+        }
+    return cuerpo

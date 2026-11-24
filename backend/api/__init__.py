@@ -19,6 +19,7 @@ from backend.api.aplicacion import (
     CARPETA_FRONTEND,
     CODIGO_FALLO_INTERNO,
     CODIGO_PETICION_INVALIDA,
+    RUTA_ANALIZAR,
     RUTA_INTERFAZ,
     RUTA_LIBRERIAS,
     RUTA_PROCESAR,
@@ -27,13 +28,14 @@ from backend.api.aplicacion import (
     RUTA_VISOR,
     crear_aplicacion,
 )
-from backend.api.veredicto import aceptado, procesado, rechazado
+from backend.api.veredicto import aceptado, analizado, procesado, rechazado
 
 __all__ = [
     "CAMPO_ARCHIVO",
     "CARPETA_FRONTEND",
     "CODIGO_FALLO_INTERNO",
     "CODIGO_PETICION_INVALIDA",
+    "RUTA_ANALIZAR",
     "RUTA_INTERFAZ",
     "RUTA_LIBRERIAS",
     "RUTA_PROCESAR",
@@ -41,6 +43,7 @@ __all__ = [
     "RUTA_VALIDAR",
     "RUTA_VISOR",
     "aceptado",
+    "analizado",
     "crear_aplicacion",
     "procesado",
     "rechazado",
