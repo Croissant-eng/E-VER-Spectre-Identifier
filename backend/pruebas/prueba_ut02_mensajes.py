@@ -154,6 +154,9 @@ CODIGOS_ESPERADOS = (
     mensajes.DATOS_ILEGIBLES,
     # Agregado por T-11 para la línea plana (CA-03.3).
     mensajes.SIN_SENAL,
+    # Agregados para la unidad de la intensidad (D-10 y D-11).
+    mensajes.UNIDAD_NO_SOPORTADA,
+    mensajes.UNIDAD_SIN_DECLARAR,
 )
 
 

@@ -30,7 +30,7 @@ def _procesar(carpeta: Path, nombre: str, configuracion=None):
     [
         "espectro-valido.jdx",
         "espectro-comprimido.jdx",
-        "espectro-valido-900-puntos.csv",
+        "espectro-con-encabezado.csv",
         "espectro-porcentaje.csv",
     ],
 )

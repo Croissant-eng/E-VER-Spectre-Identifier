@@ -13,7 +13,6 @@ de T, con T en fracción.
 from __future__ import annotations
 
 import math
-from statistics import median
 
 from backend.preprocesamiento.lector import ABSORBANCIA, DESCONOCIDA, TRANSMITANCIA
 
@@ -25,12 +24,19 @@ PORCENTAJE = "porcentaje"
 #: Es un SUPUESTO registrado en docs/plan/incremento-2.md.
 LIMITE_PORCENTAJE = 1.5
 
-#: Un CSV sin encabezado con todos sus valores entre 0 y 1 puede ser
-#: transmitancia en fracción o absorbancia baja. Se toma como transmitancia si
-#: la mitad o más de sus valores pasan de este número, porque la línea base de
-#: un espectro en transmitancia está arriba y la de absorbancia está abajo.
-#: También es un SUPUESTO.
-MEDIANA_TRANSMITANCIA = 0.5
+#: Regla D-11 para un CSV sin unidad: si algún valor pasa de este número, la
+#: intensidad es transmitancia en porcentaje. Si ninguno pasa, el archivo es
+#: ambiguo y se rechaza.
+LIMITE_CSV_SIN_UNIDAD = 1.0
+
+
+class UnidadSinDeclarar(ValueError):
+    """Un CSV sin unidad cuyos valores no dicen cuál es (D-11).
+
+    Con todos los valores entre 0 y 1 puede ser transmitancia en fracción o
+    absorbancia. Adivinar mal invierte el espectro, así que se rechaza y se
+    pide nombrar la unidad en el encabezado.
+    """
 
 #: Una transmitancia de cero o negativa no tiene logaritmo. Se sube a este
 #: valor antes de convertir para que el cálculo no falle.
@@ -62,11 +68,11 @@ def unidad_efectiva(intensidades: list[float], unidad: str) -> str:
     if unidad == TRANSMITANCIA:
         return PORCENTAJE if maximo > LIMITE_PORCENTAJE else TRANSMITANCIA
     if unidad == DESCONOCIDA:
-        if maximo > LIMITE_PORCENTAJE:
+        # D-11: sin unidad declarada, un valor mayor que 1 solo puede ser
+        # transmitancia en porcentaje. Lo demás es ambiguo y no se adivina.
+        if maximo > LIMITE_CSV_SIN_UNIDAD:
             return PORCENTAJE
-        if min(intensidades) >= 0 and median(intensidades) > MEDIANA_TRANSMITANCIA:
-            return TRANSMITANCIA
-        return ABSORBANCIA
+        raise UnidadSinDeclarar("el CSV no dice su unidad y sus valores no la delatan")
     raise ValueError(f"unidad desconocida para MOD-04: {unidad}")
 
 

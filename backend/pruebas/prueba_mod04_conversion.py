@@ -18,6 +18,7 @@ import pytest
 
 from backend.preprocesamiento.conversion import (
     PORCENTAJE,
+    UnidadSinDeclarar,
     a_absorbancia,
     ordenar,
     unidad_efectiva,
@@ -28,6 +29,8 @@ from backend.preprocesamiento.lector import (
     TRANSMITANCIA,
     leer,
 )
+from backend.preprocesamiento.procesador import procesar
+from backend.utilerias import mensajes
 
 
 def _leer(carpeta: Path, nombre: str):
@@ -73,18 +76,52 @@ def prueba_una_transmitancia_de_cero_no_rompe_el_calculo() -> None:
     assert all(math.isfinite(valor) for valor in resultado)
 
 
+# D-11: la unidad de un CSV sin encabezado.
+
+
+def prueba_d_11_sin_encabezado_y_algun_valor_mayor_que_1_es_porcentaje() -> None:
+    assert unidad_efectiva([80.0, 95.0, 12.0], DESCONOCIDA) == PORCENTAJE
+    assert unidad_efectiva([0.4, 1.2, 0.9], DESCONOCIDA) == PORCENTAJE
+
+
+@pytest.mark.parametrize("valores", [[0.8, 0.9, 0.2], [0.05, 0.1, 0.9], [0.0, 1.0]])
+def prueba_d_11_sin_encabezado_y_todo_entre_0_y_1_se_rechaza(valores) -> None:
+    with pytest.raises(UnidadSinDeclarar):
+        unidad_efectiva(valores, DESCONOCIDA)
+
+
+def prueba_d_11_el_csv_ambiguo_llega_al_usuario_con_su_mensaje() -> None:
+    texto = "\n".join(f"{400 + i * 4},{0.2 + (i % 7) / 10}" for i in range(901))
+    resultado = procesar("ambiguo.csv", texto)
+    assert not resultado.valido
+    assert resultado.codigo == mensajes.UNIDAD_SIN_DECLARAR
+    assert "encabezado" in mensajes.obtener(mensajes.UNIDAD_SIN_DECLARAR).accion
+
+
 @pytest.mark.parametrize(
-    ("valores", "esperada"),
-    [
-        ([80.0, 95.0, 12.0], PORCENTAJE),
-        ([0.8, 0.9, 0.2], TRANSMITANCIA),
-        ([0.05, 0.1, 0.9], ABSORBANCIA),
-    ],
+    ("encabezado", "esperada"),
+    [("numero_de_onda,transmitancia", TRANSMITANCIA), ("wavenumber,absorbance", ABSORBANCIA)],
 )
-def prueba_un_csv_sin_encabezado_decide_su_unidad_por_los_valores(
-    valores, esperada
+def prueba_d_11_con_encabezado_manda_el_encabezado(encabezado, esperada) -> None:
+    texto = encabezado + "\n" + "\n".join(f"{400 + i * 4},{0.5}" for i in range(3))
+    assert leer("x.csv", texto).unidad == esperada
+
+
+# D-10: la unidad que no es transmitancia ni absorbancia.
+
+
+@pytest.mark.parametrize("unidad", ["REFLECTANCE", "REFRACTIVE INDEX", "KUBELKA-MUNK"])
+def prueba_d_10_una_unidad_no_soportada_se_rechaza_sin_convertir(
+    carpeta_fixtures: Path, unidad: str
 ) -> None:
-    assert unidad_efectiva(valores, DESCONOCIDA) == esperada
+    texto = (carpeta_fixtures / "espectro-valido.jdx").read_text(encoding="ascii")
+    lineas = [
+        f"##YUNITS={unidad}" if linea.upper().startswith("##YUNITS=") else linea
+        for linea in texto.splitlines()
+    ]
+    resultado = procesar("reflectancia.jdx", "\n".join(lineas) + "\n")
+    assert not resultado.valido
+    assert resultado.codigo == mensajes.UNIDAD_NO_SOPORTADA
 
 
 # CA-03.2

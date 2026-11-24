@@ -34,7 +34,11 @@ def prueba_ca_03_3_la_linea_plana_no_falla_e_informa_sin_senal(
 
 @pytest.mark.parametrize("valor", [0.0, 0.5, 1.0, 87.3])
 def prueba_cualquier_valor_constante_es_linea_plana(valor: float) -> None:
-    texto = "\n".join(f"{400 + i * 4},{valor}" for i in range(901))
+    # Con encabezado, para que la unidad esté declarada (D-11) y lo único que
+    # se pruebe sea la línea plana.
+    texto = "numero_de_onda,absorbancia\n" + "\n".join(
+        f"{400 + i * 4},{valor}" for i in range(901)
+    )
 
     resultado = procesar("plano.csv", texto)
 

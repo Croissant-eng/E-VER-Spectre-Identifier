@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from backend.nucleo import obtener_registro
 from backend.preprocesamiento import conversion, rejilla
-from backend.preprocesamiento.lector import ArchivoIlegible, leer
+from backend.preprocesamiento.lector import ArchivoIlegible, UnidadNoSoportada, leer
 from backend.utilerias import mensajes
 from backend.utilerias.configuracion import Configuracion
 from backend.utilerias.configuracion import obtener as obtener_configuracion
@@ -54,12 +54,19 @@ def procesar(
 
     try:
         lectura = leer(nombre, contenido)
+    except UnidadNoSoportada as error:
+        # D-10: la unidad se revisa aquí, antes de convertir.
+        return _rechazo(nombre, mensajes.UNIDAD_NO_SOPORTADA, str(error))
     except ArchivoIlegible as error:
         return _rechazo(nombre, mensajes.DATOS_ILEGIBLES, str(error))
 
     ordenados = conversion.ordenar(lectura.pares)
     intensidades = [intensidad for _, intensidad in ordenados]
-    unidad = conversion.unidad_efectiva(intensidades, lectura.unidad)
+    try:
+        unidad = conversion.unidad_efectiva(intensidades, lectura.unidad)
+    except conversion.UnidadSinDeclarar as error:
+        # D-11: un CSV ambiguo no se convierte a ciegas.
+        return _rechazo(nombre, mensajes.UNIDAD_SIN_DECLARAR, str(error))
     absorbancias = conversion.a_absorbancia(intensidades, lectura.unidad)
     en_absorbancia = [
         (onda, absorbancia)
