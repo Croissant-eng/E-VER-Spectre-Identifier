@@ -1079,11 +1079,14 @@ Los del Plan V3 Paso 8 para este incremento, más los que aparecen al detallarlo
 - **D-12 / T-3R — conjunto de datos:**
 - **D-13 / T-16d — métricas de RNF-08:**
 - **D-14 / T-3R — espectros de referencia añadidos:**
-- **D-15 / T-17 — umbral y pesos:**
-- **D-16 — ¿se activó el plan B?:**
-- **D-17 / T-18 — contrato de `/api/analizar`:**
+- **D-15 / T-17 — umbral y pesos:** UT-03 ya traía `umbral_confianza`, `peso_reglas` y `peso_ml` en el bloque `motor`; ahora el cargador los revisa. Cada peso va de 0 a 1, los dos suman 1 y el umbral es una fracción. Si no cuadra, el backend no arranca. La fusión vive en `motor_identificacion/inferencia/fusion.py` y compara el porcentaje entero, redondeando la mitad hacia arriba, contra el umbral en porcentaje. Las pruebas están en `backend/pruebas/prueba_t17_fusion.py`.
+- **D-16 — ¿se activó el plan B?:** No. Nadie lo ha decidido y no se decide aquí. Lo que pasa hoy es D-16.4: como no existe un modelo entrenado, la aplicación arranca en modo reglas, lo anota en el registro y la respuesta dice `"modo": "reglas"` con `evidencia.ml` en null. El hueco del modelo es el protocolo `ModeloML` de la fusión: T-16c solo tiene que entregar un objeto con `puntos_rejilla` y `probabilidades(ventana)` y pasarlo a `crear_aplicacion(modelo=...)`.
+- **D-17 / T-18 — contrato de `/api/analizar`:** Recibe en JSON el objeto `espectro` de `/api/procesar` (también acepta la respuesta entera). Antes del motor se revisa la longitud, el eje contra la rejilla de UT-03, los valores entre 0 y 1 y el tramo medido; si algo falla responde 200 con `ESPECTRO_INVALIDO`. Si todo sale bien responde 200 con `{valido, detecciones, sin_detecciones, umbral, modo}`; cada detección lleva además `nombre`, de UT-01, y `porcentaje`, el número con que se decidió. Sin detecciones agrega `aviso` con el texto de UT-02 (`SIN_DETECCIONES`). Un fallo del motor responde 500 con `ANALISIS_FALLIDO`. Este código es nuevo y se aparta de lo que decía D-17: `FALLO_INTERNO` dice «No se pudo revisar el archivo» y CA-05.4 pide literalmente «No fue posible completar el análisis; intenta de nuevo».
 - **D-18 — dónde quedó el modelo:**
-- **D-19 — N y la comprobación de arranque:**
+- **D-19 — N y la comprobación de arranque:** `motivo_para_solo_reglas` compara `puntos_rejilla` del modelo con UT-03. Si no coinciden el modelo no se usa y la aplicación sigue en modo reglas. Hay prueba con un modelo de mentira de otra rejilla.
 - **Reglas de desempate R-1 a R-4 — cómo quedaron:**
-- **Evidencia:**
+- **Evidencia:** `docs/evidencia/t-18-lista-carbonilo.png`, la página real con un CSV fabricado con un carbonilo en 1715 (C=O al 80 %). T-16b, la paridad entre entrenamiento y producción, está en `backend/pruebas/prueba_t16b_paridad.py` y `herramientas/entrenamiento/preparar.py`; una mutación que quita el redondeo de seis decimales la hace fallar.
 - **Pendientes:**
+  - **CA-08.1 y CA-08.3 no se cumplen con la vía de reglas actual.** Sobre ruido puro reporta entre cinco y seis grupos (62 a 80 %), y sobre una línea base inclinada o curva reporta O–H al 100 % sin pico. Las pruebas quedan como fallo esperado estricto en `prueba_t18_t19_analizar.py`. Coincide con la hipótesis del traspaso: los pisos de D-22 son el punto débil. No se movió ningún piso ni umbral; se quita la marca cuando el motor acierte.
+  - CA-05.1 y CA-05.2 tienen su prueba con los espectros reales, pero se saltan donde falta `datos/referencia`. Hay que correrlas en una computadora del equipo.
+  - Sin hacer, porque dependen de decisiones abiertas: T-16a-2, T-16c y T-16d (D-24 y las enmiendas a D-12 y D-13), y T-15e (CA-06.2, toca R-1).
