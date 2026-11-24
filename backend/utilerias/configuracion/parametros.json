@@ -11,7 +11,7 @@
     "jcamp_etiquetas_datos_una_de": ["##XYDATA=", "##PEAK TABLE="]
   },
   "procesamiento": {
-    "_nota": "MOD-04 (incremento 2). La rejilla de 1024 puntos es un SUPUESTO: el diseño de MOD-06 solo la da como ejemplo.",
+    "_nota": "MOD-04 (incremento 2). La rejilla de 1024 puntos es DECISIÓN del equipo, cerrada en D-19 el 23/11/2026: deja de ser SUPUESTO. Queda congelada desde T-16c; cambiarla después obliga a reentrenar.",
     "puntos_rejilla": 1024,
     "rango_rejilla_cm1": [400, 4000]
   },

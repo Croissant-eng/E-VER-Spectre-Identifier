@@ -25,8 +25,8 @@ datos/referencia/*
 
 # Pesos del modelo de MOD-06: datos pesados, se respaldan aparte (ver el riesgo
 # de dataset del plan).
-motor-identificacion/modelo/*
-!motor-identificacion/modelo/.gitkeep
+motor_identificacion/modelo/*
+!motor_identificacion/modelo/.gitkeep
 
 # UT-03 · el archivo de parametros SI va versionado (D-6): la prueba antideriva
 # y el arranque del backend dependen de que este en el repositorio.
@@ -35,3 +35,8 @@ motor-identificacion/modelo/*
 # Nunca subir archivos de usuarios (RNF-09)
 subidas/
 tmp/
+
+# Conjunto Chemotion IR (D-12 opcion B): CC BY-SA 4.0. Los espectros no se
+# redistribuyen; lo que se versiona es el indice, los scripts y la nota de
+# origen (datos/dataset/ORIGEN.md).
+datos/dataset/espectros/
