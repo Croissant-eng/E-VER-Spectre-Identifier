@@ -97,6 +97,14 @@ SIN_DETECCIONES = "SIN_DETECCIONES"
 #: (CA-07.3). El grupo se sigue mostrando con este aviso en lugar del texto.
 EXPLICACION_NO_DISPONIBLE = "EXPLICACION_NO_DISPONIBLE"
 
+#: Incremento 5. Lo que llegó a POST /api/reporte no trae el nombre, el
+#: espectro o la imagen de la gráfica con la forma esperada.
+REPORTE_INVALIDO = "REPORTE_INVALIDO"
+
+#: Incremento 5. Falló algo al generar el PDF (CA-09.3). Los resultados siguen
+#: en pantalla y se puede volver a pedir.
+REPORTE_FALLIDO = "REPORTE_FALLIDO"
+
 
 class CodigoDesconocido(Exception):
     """Se pidió un código que no está en el catálogo.
@@ -352,6 +360,24 @@ _CATALOGO: dict[str, _Entrada] = {
             "Consulte la región resaltada en la gráfica y una tabla de "
             "absorciones infrarrojas para interpretarlo."
         ),
+    ),
+    # Incremento 5: el reporte en PDF (CA-09.3).
+    REPORTE_INVALIDO: _Entrada(
+        titulo="No se pudo armar el reporte",
+        texto=lambda c: (
+            "Faltan datos del análisis o de la gráfica para generar el reporte."
+        ),
+        accion=lambda c: (
+            "Pulse «Analizar» otra vez y después «Descargar reporte»."
+        ),
+    ),
+    REPORTE_FALLIDO: _Entrada(
+        titulo="No se pudo generar el reporte",
+        texto=lambda c: (
+            "Ocurrió un problema al generar el PDF. Sus resultados siguen en "
+            "pantalla."
+        ),
+        accion=lambda c: "Pulse «Descargar reporte» para intentarlo de nuevo.",
     ),
 }
 
