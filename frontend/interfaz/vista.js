@@ -48,7 +48,7 @@ export const TEXTOS = {
     // D-4: «la interfaz muestra que el documento fue aprobado».
     titulo: "Documento aprobado",
     mensaje: "El archivo pasó la validación y está listo para analizarse.",
-    nota: "El análisis de los grupos funcionales llega en el siguiente incremento.",
+    nota: "Cuando aparezca la gráfica, pulse «Analizar» para buscar los grupos funcionales.",
   },
   sinVeredicto: {
     titulo: "No se pudo mostrar el resultado",
@@ -111,8 +111,8 @@ export function vistaSinVeredicto(textos = TEXTOS.sinVeredicto) {
 /**
  * La vista que corresponde a un veredicto (contrato de la sección 5).
  *
- * Aceptado → nombre del archivo, aviso de aprobado y «Analizar» habilitado y
- * sin acción (D-4). Rechazado → título, mensaje y acción del veredicto, sin el
+ * Aceptado → nombre del archivo, aviso de aprobado y «Analizar» habilitado
+ * (D-4). Rechazado → título, mensaje y acción del veredicto, sin el
  * código. Cualquier respuesta incompleta → `vistaSinVeredicto()`.
  *
  * @param {unknown} veredicto lo que respondió `POST /api/validar`.

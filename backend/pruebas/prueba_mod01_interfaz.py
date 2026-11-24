@@ -200,7 +200,7 @@ def prueba_la_pagina_no_trae_los_parametros_de_ut03() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# D-4 · «Analizar» presente, habilitado al aceptar y sin acción
+# D-4 · «Analizar» presente y habilitado al aceptar
 # --------------------------------------------------------------------------- #
 
 
@@ -214,23 +214,25 @@ def prueba_el_boton_analizar_existe_y_nace_sin_poder_usarse() -> None:
     )
 
 
-def prueba_el_boton_analizar_no_tiene_accion() -> None:
-    """D-4: presente y habilitado, **sin acción**. RF-04 es del incremento 3.
+def prueba_el_boton_analizar_solo_actua_con_un_espectro_cargado() -> None:
+    """D-4 lo dejó sin acción en el incremento 1; desde el incremento 3 analiza.
 
-    La forma de garantizarlo es que nadie le ponga un escuchador de clic ni un
-    `onclick`: si alguien se lo agrega, esta prueba falla.
+    Lo que se cuida ahora es que tenga una sola acción, puesta desde
+    interfaz.js, y que no haga nada mientras no exista un espectro procesado.
     """
     html = PAGINA.read_text(encoding="utf-8")
     assert "onclick" not in html
 
+    con_accion = []
     for archivo in sorted(INTERFAZ.glob("*.js")):
         texto = archivo.read_text(encoding="utf-8")
         for linea in texto.splitlines():
             if "addEventListener" in linea and "analizar" in linea.lower():
-                pytest.fail(
-                    f"{archivo.name}: «Analizar» no debe tener acción todavía "
-                    f"(D-4): {linea.strip()}"
-                )
+                con_accion.append(archivo.name)
+
+    assert con_accion == ["interfaz.js"]
+    interfaz = (INTERFAZ / "interfaz.js").read_text(encoding="utf-8")
+    assert "if (espectroActual === null)" in interfaz
 
 
 def prueba_el_codigo_del_rechazo_no_aparece_en_la_pantalla() -> None:

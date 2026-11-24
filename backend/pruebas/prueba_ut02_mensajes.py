@@ -157,6 +157,10 @@ CODIGOS_ESPERADOS = (
     # Agregados para la unidad de la intensidad (D-10 y D-11).
     mensajes.UNIDAD_NO_SOPORTADA,
     mensajes.UNIDAD_SIN_DECLARAR,
+    # Agregados en el incremento 3 para el análisis (D-17, CA-05.4 y CA-08).
+    mensajes.ESPECTRO_INVALIDO,
+    mensajes.ANALISIS_FALLIDO,
+    mensajes.SIN_DETECCIONES,
 )
 
 

@@ -47,14 +47,17 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.api.veredicto import aceptado, procesado, rechazado
+from backend.api.entrada_analisis import espectro_desde
+from backend.api.veredicto import aceptado, analizado, procesado, rechazado
 from backend.manejador_archivos import recibir
 from backend.nucleo import obtener_registro
 from backend.preprocesamiento import procesar
 from backend.utilerias import mensajes
 from backend.utilerias.configuracion import Configuracion, ErrorDeConfiguracion
 from backend.utilerias.configuracion import obtener as obtener_configuracion
+from backend.utilerias.catalogo import obtener as obtener_catalogo
 from backend.validacion import validar
+from motor_identificacion.inferencia import ModeloML, identificar, motivo_para_solo_reglas
 
 _registro = obtener_registro("api")
 
@@ -70,6 +73,11 @@ RUTA_VALIDAR: str = "/api/validar"
 #: guarda en ningún lado (RNF-09), la página lo vuelve a mandar.
 #: `frontend/servicios/procesamiento.js` repite esta ruta.
 RUTA_PROCESAR: str = "/api/procesar"
+#: Incremento 3 (D-17). Recibe en JSON el objeto espectro que entregó
+#: /api/procesar y responde la salida del motor. No recibe el archivo: el motor
+#: solo ve números. `frontend/servicios/analisis.js` repite esta ruta.
+RUTA_ANALIZAR: str = "/api/analizar"
+
 CAMPO_ARCHIVO: str = "archivo"
 
 #: Dónde se sirve cada carpeta del frontend. Se conservan los nombres del
@@ -128,6 +136,7 @@ def crear_aplicacion(
     configuracion: Configuracion | None = None,
     *,
     carpeta_frontend: Path | None = None,
+    modelo: ModeloML | None = None,
 ) -> FastAPI:
     """Arma la aplicación.
 
@@ -140,6 +149,10 @@ def crear_aplicacion(
             repositorio. La herramienta de evidencia pasa una **copia temporal**
             con un archivo extra que dispara la subida sola para la captura; así
             el frontend del repositorio no lleva ganchos de prueba.
+        modelo: la red neuronal de T-16 ya cargada. Mientras no exista un
+            modelo entrenado se queda en None y el motor trabaja solo con
+            reglas, como pide D-16. La aplicación lo anota en el registro al
+            arrancar y no se lo muestra al usuario.
 
     Returns:
         La aplicación lista para servir.
@@ -153,6 +166,17 @@ def crear_aplicacion(
         configuracion if configuracion is not None else _configuracion_de_arranque()
     )
     _preparar_tipos()
+
+    # UT-01 se lee una vez al arrancar, igual que UT-03: si el catálogo está
+    # roto, mejor no arrancar que fallar en el primer análisis.
+    catalogo = obtener_catalogo()
+    motivo = motivo_para_solo_reglas(modelo, parametros)
+    if motivo is not None:
+        # D-16: la falta de modelo es una degradación anunciada, no un error.
+        _registro.info("motor arranque | modo=reglas | motivo=%s", motivo)
+        modelo = None
+    else:
+        _registro.info("motor arranque | modo=hibrido")
 
     aplicacion = FastAPI(
         title="E-VER Spectre Identifier",
@@ -268,6 +292,47 @@ def crear_aplicacion(
             )
         finally:
             del recepcion
+
+    @aplicacion.post(RUTA_ANALIZAR)
+    async def analizar_espectro(peticion: Request) -> JSONResponse:
+        """MOD-06 sobre el espectro que la página ya tiene (incremento 3).
+
+        Un espectro que no tiene la forma del contrato se rechaza con 200 y
+        ESPECTRO_INVALIDO antes de llegar al motor (D-17). Un fallo del motor
+        responde 500 con ANALISIS_FALLIDO, el texto de CA-05.4. Que ningún
+        grupo pase el umbral no es ninguna de las dos cosas: es un resultado
+        con su aviso (CA-08).
+        """
+        try:
+            try:
+                cuerpo = await peticion.json()
+            except ValueError:
+                cuerpo = None
+            espectro = espectro_desde(cuerpo, parametros)
+            if espectro is None:
+                _registro.warning(
+                    "api analizar | resultado=%s", mensajes.ESPECTRO_INVALIDO
+                )
+                return JSONResponse(rechazado(mensajes.ESPECTRO_INVALIDO, parametros))
+
+            resultado = identificar(espectro, modelo, catalogo, parametros)
+            # El registro guarda qué se detectó, nunca el espectro (RNF-09).
+            _registro.info(
+                "api analizar | modo=%s | detecciones=%s",
+                resultado.modo,
+                ",".join(d.grupo for d in resultado.detecciones) or "ninguna",
+            )
+            return JSONResponse(analizado(resultado, catalogo, parametros))
+        except Exception:
+            _registro.exception(
+                "api fallo interno | ruta=%s | resultado=%s",
+                RUTA_ANALIZAR,
+                mensajes.ANALISIS_FALLIDO,
+            )
+            return JSONResponse(
+                status_code=CODIGO_FALLO_INTERNO,
+                content=rechazado(mensajes.ANALISIS_FALLIDO, parametros),
+            )
 
     @aplicacion.get("/")
     async def inicio() -> RedirectResponse:

@@ -98,13 +98,11 @@ describe("veredicto aceptado (D-4)", () => {
     assert.equal(vista.analizar.habilitado, true);
   });
 
-  it("avisa que analizar llega en el siguiente incremento", () => {
+  it("explica que el siguiente paso es analizar", () => {
     const vista = vistaDeVeredicto(ACEPTADO);
 
-    assert.ok(
-      vista.analizar.nota.includes("incremento"),
-      "la nota explica por qué el botón no hace nada todavía",
-    );
+    assert.ok(vista.analizar.nota.includes("Analizar"));
+    assert.ok(!vista.analizar.nota.includes("incremento"));
   });
 
   it("no inventa una acción que la persona deba hacer", () => {

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>E-VER · Validar un espectro</title>
+    <title>E-VER · Analizar un espectro</title>
     <!--
       MOD-01 · interfaz mínima del incremento 1 (T-06).
 
@@ -67,9 +67,8 @@
 
         <div class="bloque-analizar" id="bloque-analizar" hidden>
           <!--
-            D-4: presente y habilitado cuando el documento se aprueba, y SIN
-            acción. Nadie le pone un manejador de clic, ni aquí ni en el
-            JavaScript: hasta el incremento 3 no hay nada que analizar.
+            D-4: presente cuando el documento se aprueba. Desde el incremento
+            3 manda el espectro al motor y muestra los grupos más abajo.
           -->
           <button class="boton boton-secundario" type="button" id="analizar">
             Analizar
@@ -101,6 +100,23 @@
             aria-label="Gráfica del espectro infrarrojo"
           ></canvas>
         </div>
+      </section>
+
+      <!--
+        Incremento 3: los grupos funcionales que encontró el motor, de mayor a
+        menor confianza (T-18), o el aviso de que no hubo detecciones
+        confiables (T-19). Nace escondida hasta que se pulsa «Analizar».
+      -->
+      <section
+        class="tarjeta analisis"
+        id="analisis"
+        aria-live="polite"
+        hidden
+      >
+        <h2 class="analisis-titulo" id="analisis-titulo" hidden></h2>
+        <p class="analisis-mensaje" id="analisis-mensaje" hidden></p>
+        <p class="analisis-accion" id="analisis-accion" hidden></p>
+        <ol class="analisis-lista" id="analisis-lista" hidden></ol>
       </section>
     </main>
 

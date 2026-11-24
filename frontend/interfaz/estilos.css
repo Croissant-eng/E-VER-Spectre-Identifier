@@ -278,6 +278,49 @@ h1 {
   font-size: 0.9rem;
 }
 
+/* Incremento 3: la lista de grupos funcionales y sus avisos. */
+.analisis-titulo {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.analisis-mensaje,
+.analisis-accion {
+  margin: 0 0 0.5rem;
+}
+
+.analisis-accion {
+  font-weight: 600;
+}
+
+.analisis-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analisis-fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--borde);
+}
+
+.analisis-confianza {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.analisis[data-estado="sin-detecciones"] {
+  border-color: var(--texto-suave);
+}
+
+.analisis[data-estado="fallo"] .analisis-titulo {
+  color: var(--rechazado);
+}
+
 .pie {
   color: var(--texto-suave);
   font-size: 0.85rem;

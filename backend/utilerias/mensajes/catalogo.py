@@ -80,6 +80,19 @@ UNIDAD_NO_SOPORTADA = "UNIDAD_NO_SOPORTADA"
 #: espectro, así que se pide nombrar la unidad (D-11).
 UNIDAD_SIN_DECLARAR = "UNIDAD_SIN_DECLARAR"
 
+#: Incremento 3. Lo que llegó a POST /api/analizar no tiene la forma del
+#: espectro procesado: otra longitud, otro eje o valores fuera de 0 a 1. Se
+#: rechaza antes de llegar al motor (D-17).
+ESPECTRO_INVALIDO = "ESPECTRO_INVALIDO"
+
+#: Incremento 3. El motor falló por dentro al analizar (CA-05.4). El texto es
+#: el que pide el criterio, palabra por palabra.
+ANALISIS_FALLIDO = "ANALISIS_FALLIDO"
+
+#: Incremento 3. Ningún grupo alcanzó el umbral (CA-08). No es un error: viaja
+#: dentro del resultado del análisis como aviso, nunca como rechazo.
+SIN_DETECCIONES = "SIN_DETECCIONES"
+
 
 class CodigoDesconocido(Exception):
     """Se pidió un código que no está en el catálogo.
@@ -106,6 +119,14 @@ class Mensaje:
 _BYTES_POR_MEGABYTE = 1024 * 1024
 
 #: Guion largo y «centímetros a la menos uno», tal como los escribe el plan.
+def _porcentaje_del_umbral(configuracion: Configuracion) -> int:
+    """El umbral de UT-03 en porcentaje entero, para nombrarlo en el aviso."""
+    motor = configuracion.motor
+    if motor is None:
+        raise ValueError("UT-03 no trae el bloque motor con el umbral")
+    return round(motor.umbral_confianza * 100)
+
+
 _GUION = "–"
 _CM_MENOS_UNO = "cm⁻¹"
 
@@ -282,6 +303,38 @@ _CATALOGO: dict[str, _Entrada] = {
             "Agregue una primera fila de encabezado que nombre la unidad, por "
             "ejemplo «numero_de_onda,transmitancia» o "
             "«numero_de_onda,absorbancia», y vuelva a subir el archivo."
+        ),
+    ),
+    # Incremento 3: el análisis (D-17, CA-05.4 y CA-08).
+    ESPECTRO_INVALIDO: _Entrada(
+        titulo="El espectro no se puede analizar",
+        texto=lambda c: (
+            "Los datos que llegaron para el análisis no tienen la forma del "
+            "espectro procesado."
+        ),
+        accion=lambda c: (
+            "Vuelva a subir el archivo para que se procese de nuevo y después "
+            "pulse «Analizar»."
+        ),
+    ),
+    ANALISIS_FALLIDO: _Entrada(
+        titulo="Análisis no completado",
+        texto=lambda c: "No fue posible completar el análisis; intenta de nuevo.",
+        accion=lambda c: (
+            "Pulse «Analizar» otra vez; su archivo sigue cargado y no hace falta "
+            "volver a subirlo."
+        ),
+    ),
+    SIN_DETECCIONES: _Entrada(
+        titulo="No se encontraron detecciones confiables",
+        texto=lambda c: (
+            "Ningún grupo funcional alcanzó el "
+            f"{_porcentaje_del_umbral(c)} % de confianza que se necesita para "
+            "reportarlo."
+        ),
+        accion=lambda c: (
+            "Revise la calidad del espectro, por ejemplo el ruido, la línea base "
+            "o el tramo medido, y vuelva a analizarlo."
         ),
     ),
 }

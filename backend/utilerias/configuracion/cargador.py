@@ -130,8 +130,8 @@ class ParametrosMotor:
     descuido y no deben uniformarse — al 50 % la métrica de R-4 no separa las
     clases. La definición es parte del parámetro.
 
-    El umbral del 60 % y los pesos de la fusión **no** están aquí todavía: son
-    de T-17, que los añade con su propia validación.
+    T-17 agregó al final el umbral y los pesos de la fusión (D-15). Los pesos
+    se comprueban al cargar: cada uno entre 0 y 1 y los dos sumando 1.
     """
 
     tolerancia_banda_puntual_cm1: float
@@ -139,6 +139,12 @@ class ParametrosMotor:
     ancho_pico_agudo_max_cm1: float
     definicion_metodo: DefinicionMetodo
     fuerza_minima_relativa: Mapping[str, PisoDeFuerza]
+    #: El umbral de confianza, como fracción. El 0.6 del archivo es el 60 %.
+    umbral_confianza: float = 0.6
+    #: Peso de la vía de reglas en la fusión.
+    peso_reglas: float = 0.5
+    #: Peso de la vía del modelo. Con 0 el motor trabaja solo con reglas.
+    peso_ml: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -224,6 +230,50 @@ def _fraccion(bloque: dict[str, Any], llave: str, ruta: Path, prefijo: str) -> f
             ruta,
         )
     return valor
+
+
+#: Cuánto se perdona al sumar los dos pesos. 0.3 y 0.7 no dan 1 exacto en
+#: punto flotante y no por eso la configuración está mal.
+_TOLERANCIA_SUMA_DE_PESOS: float = 1e-9
+
+
+def _peso(bloque: dict[str, Any], llave: str, ruta: Path, prefijo: str) -> float:
+    """Un peso de la fusión: un número entre 0 y 1, los dos incluidos."""
+    valor = _presente(bloque, llave, ruta, prefijo)
+    if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+        raise _error(
+            f"«{prefijo}.{llave}» debe ser un número, no {type(valor).__name__}",
+            ruta,
+        )
+    if valor < 0 or valor > 1:
+        raise _error(
+            f"«{prefijo}.{llave}» debe estar entre 0 y 1, no {valor:g}", ruta
+        )
+    return float(valor)
+
+
+def _fusion(bloque_motor: dict[str, Any], ruta: Path) -> tuple[float, float, float]:
+    """El umbral y los dos pesos de la fusión (D-15), ya revisados.
+
+    Si los pesos no suman 1 el backend no arranca. Seguir con una suma de 1.2
+    daría confianzas por encima del 100 % sin que nadie lo notara.
+    """
+    umbral = _numero_positivo(bloque_motor, "umbral_confianza", ruta, "motor")
+    if umbral > 1:
+        raise _error(
+            "«motor.umbral_confianza» es una fracción entre 0 y 1 (0.6 quiere "
+            f"decir 60 %), no {umbral:g}",
+            ruta,
+        )
+    peso_reglas = _peso(bloque_motor, "peso_reglas", ruta, "motor")
+    peso_ml = _peso(bloque_motor, "peso_ml", ruta, "motor")
+    if abs(peso_reglas + peso_ml - 1) > _TOLERANCIA_SUMA_DE_PESOS:
+        raise _error(
+            "«motor.peso_reglas» y «motor.peso_ml» deben sumar 1, y suman "
+            f"{peso_reglas + peso_ml:g}",
+            ruta,
+        )
+    return umbral, peso_reglas, peso_ml
 
 
 def _pisos_de_fuerza(
@@ -418,7 +468,11 @@ def cargar(ruta: Path | str | None = None) -> Configuracion:
         bloque_motor = _bloque(datos, "motor", ruta_final)
         bloque_metodo = _bloque(bloque_motor, "definicion_metodo", ruta_final)
         prefijo_metodo = "motor.definicion_metodo"
+        umbral, peso_reglas, peso_ml = _fusion(bloque_motor, ruta_final)
         parametros_motor = ParametrosMotor(
+            umbral_confianza=umbral,
+            peso_reglas=peso_reglas,
+            peso_ml=peso_ml,
             tolerancia_banda_puntual_cm1=_numero_positivo(
                 bloque_motor, "tolerancia_banda_puntual_cm1", ruta_final, "motor"
             ),
