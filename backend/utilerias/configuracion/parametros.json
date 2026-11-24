@@ -19,6 +19,10 @@
     "_nota": "Se usan a partir del incremento 3 (MOD-06).",
     "umbral_confianza": 0.6,
     "peso_reglas": 0.5,
-    "peso_ml": 0.5
+    "peso_ml": 0.5,
+    "_nota_anchos": "D-20 · T-15a. Los dos umbrales de ancho están en null porque siguen siendo SUPUESTO: la medición ya existe (docs/evidencia/d-20-anchos.md), pero el equipo todavía no aprueba el valor. Mientras sean null, T-15b no puede aplicar R-1 ni R-4, y eso es intencional: mejor detenerse que arrancar con un número inventado.",
+    "tolerancia_banda_puntual_cm1": 15,
+    "ancho_media_altura_umbral_cm1": null,
+    "ancho_pico_agudo_max_cm1": null
   }
 }

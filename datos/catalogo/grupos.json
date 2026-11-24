@@ -1,0 +1,115 @@
+{
+  "_descripcion": "UT-01 · Catálogo de los 7 grupos funcionales. Fuente única de los rangos: nadie los vuelve a escribir en el código (incremento 3, sección 3, regla 2). Se lee solo a través de backend/utilerias/catalogo.",
+  "_fuente": "docs/plan/incremento-3.md §4 — que a su vez transcribe Requerimientos V3.2 §6.2 y MOD-06 §4. Si un número de aquí no está en esa tabla, está mal.",
+  "version": "1.0.0",
+  "_roles_de_region_acompanante": {
+    "confirmacion": "Desempate R-2: sin esta banda el score del grupo se acota por debajo del umbral. No es decoración.",
+    "par": "Una de las bandas del par característico, dentro de la región principal. GF-07 exige las dos. La posición es aproximada (el plan escribe «~1600» y «~1500»): la tolerancia es parámetro de UT-03, no dato del catálogo, así que el rango va como un punto.",
+    "indicio": "Señala un subtipo del grupo. Es informativa: no condiciona la detección."
+  },
+  "_orden": "GF-01 … GF-07 es el orden del vector de etiquetas de T-16 y de la salida del CNN. Queda fijado aquí, una sola vez. No lo reordene ni lo derive de otra cosa.",
+  "orden_canonico": [
+    "GF-01",
+    "GF-02",
+    "GF-03",
+    "GF-04",
+    "GF-05",
+    "GF-06",
+    "GF-07"
+  ],
+  "grupos": [
+    {
+      "id": "GF-01",
+      "nombre": "O–H (alcoholes, fenoles y ácidos)",
+      "enlace_vibracion": "O–H",
+      "region_cm1": [3200, 3550],
+      "regiones_acompanantes": [
+        { "rango": [2500, 3300], "rol": "indicio" }
+      ],
+      "intensidad": "fuerte",
+      "forma": "ancha",
+      "pista": "Banda ancha e intensa; en ácidos la envolvente se extiende hacia números de onda menores y puede cubrir la zona del C–H alifático.",
+      "subtipos": []
+    },
+    {
+      "id": "GF-02",
+      "nombre": "N–H (aminas y amidas)",
+      "enlace_vibracion": "N–H",
+      "region_cm1": [3300, 3500],
+      "regiones_acompanantes": [],
+      "intensidad": "media",
+      "forma": "angosta",
+      "pista": "Más angosta que la de O–H; dos picos en aminas primarias y uno en secundarias.",
+      "subtipos": []
+    },
+    {
+      "id": "GF-03",
+      "nombre": "C–H alifático (sp³)",
+      "enlace_vibracion": "C–H",
+      "region_cm1": [2850, 2960],
+      "regiones_acompanantes": [],
+      "intensidad": "media",
+      "forma": "aguda",
+      "pista": "Picos agudos y resueltos en el extremo alto de su región; un hombro ancho dentro de la envolvente de O–H de un ácido no basta.",
+      "subtipos": []
+    },
+    {
+      "id": "GF-04",
+      "nombre": "C≡N (nitrilos)",
+      "enlace_vibracion": "C≡N",
+      "region_cm1": [2210, 2260],
+      "regiones_acompanantes": [],
+      "intensidad": "media",
+      "forma": "aguda",
+      "pista": "Pico agudo en una zona del espectro que casi siempre está vacía.",
+      "subtipos": []
+    },
+    {
+      "id": "GF-05",
+      "nombre": "C=O (carbonilo)",
+      "enlace_vibracion": "C=O",
+      "_nota_subtipos": "Los cinco de MOD-06 §4, informativos para las explicaciones del incremento 4 (T-20). En el incremento 3 GF-05 es una sola detección: RF-04 pide los siete grupos, no sus subtipos. Limitación conocida que el plan §4 documenta: la amida se extiende por debajo de la región principal, así que una amida de C=O bajo queda fuera de donde GF-05 se detecta. No se ensancha GF-05 (sería cambio de alcance) y el subtipo no amplía ninguna detección.",
+      "region_cm1": [1670, 1780],
+      "regiones_acompanantes": [],
+      "intensidad": "fuerte",
+      "forma": "aguda",
+      "pista": "Suele ser la señal más evidente del espectro.",
+      "subtipos": [
+        { "nombre": "cetona", "region_cm1": [1715, 1715] },
+        { "nombre": "aldehído", "region_cm1": [1720, 1740] },
+        { "nombre": "éster", "region_cm1": [1735, 1750] },
+        { "nombre": "ácido carboxílico", "region_cm1": [1690, 1760] },
+        { "nombre": "amida", "region_cm1": [1630, 1700] }
+      ]
+    },
+    {
+      "id": "GF-06",
+      "nombre": "C=C (alquenos)",
+      "enlace_vibracion": "C=C",
+      "_nota_forma": "El plan no le asigna forma a este grupo: la columna de la sección 4 solo dice «Media / débil». Se deja en null en vez de inventarla.",
+      "region_cm1": [1620, 1680],
+      "regiones_acompanantes": [
+        { "rango": [3020, 3100], "rol": "confirmacion" }
+      ],
+      "intensidad": "media o débil",
+      "forma": null,
+      "pista": "Banda débil: la confirmación está en el =C–H acompañante, no en la intensidad.",
+      "subtipos": []
+    },
+    {
+      "id": "GF-07",
+      "nombre": "Anillo aromático",
+      "enlace_vibracion": "estiramiento del anillo",
+      "region_cm1": [1450, 1600],
+      "regiones_acompanantes": [
+        { "rango": [1600, 1600], "rol": "par" },
+        { "rango": [1500, 1500], "rol": "par" },
+        { "rango": [3000, 3100], "rol": "confirmacion" }
+      ],
+      "intensidad": "media",
+      "forma": "par de bandas",
+      "pista": "Exige el par de bandas del anillo más el C–H aromático; un solo pico dentro de la región puede ser artefacto del disolvente.",
+      "subtipos": []
+    }
+  ]
+}

@@ -7,7 +7,9 @@
 **Tareas del Plan V3:** T-14 … T-19 (más T-3R, de datos)
 **Hitos:** H8 → H9 → H10
 **Depende de:** Incremento 2 cerrado (H7) — MOD-04 entrega el espectro normalizado
-**Versión de este plan:** 1.6 (23/11/2026) · **Estado:** **D-12 a D-19 cerradas. Sin supuestos bloqueantes.** El contrato de `/api/procesar` y N = 1024 llegaron confirmados del incremento 2; los siete grupos tienen espectro de referencia. **T-14 y T-15 pueden arrancar ya**; T-16 arranca en paralelo en cuanto T-3R entregue el conjunto.
+**Versión de este plan:** 2.0 (24/11/2026) · **Estado:** **D-12 a D-20 cerradas. Sin supuestos abiertos.** T-14 implementado y T-15a medido; los tres parámetros de UT-03 tienen valor aprobado. **Siguiente: T-15b**, la vía de reglas, que cierra H8. T-16 arranca en paralelo en cuanto T-3R entregue el conjunto.
+
+*(Historial: 1.0 decisiones abiertas · 1.1–1.4 cierre de D-12 a D-18 y espectros elegidos · 1.5–1.6 D-19 y contrato de `/api/procesar` · 1.7 D-20 y corrección de la sección 4 · 1.8 `enlace_vibracion` y tercer parámetro · 1.9 medición de T-15a · 2.0 umbrales aprobados.)*
 
 ---
 
@@ -410,6 +412,80 @@ El incremento 2 confirmó dónde vive y cuánto vale: **`puntos_rejilla = 1024`*
 
 ---
 
+### D-20 · Codificación del catálogo (resueltas al cerrar T-14)
+
+Seis decisiones que tomó el agente al implementar T-14 y que el equipo aprueba el 23/11/2026:
+
+| # | Decisión | Veredicto |
+|---|---|---|
+| 1 | El par ~1600/~1500 de GF-07 va como dos `regiones_acompanantes` de rango puntual (`[1600,1600]`, `[1500,1500]`) con `rol: "par"`; la tolerancia es parámetro de UT-03, no del catálogo | **Aprobada**, con una condición añadida: el lector **valida que un grupo con rol `par` tenga exactamente dos entradas**. Si un dedazo borra una, R-2 se debilita en silencio y hoy nada lo detectaría |
+| 2 | `rol` es vocabulario cerrado: `confirmacion` \| `par` \| `indicio` | **Aprobada.** T-15 lee un código en vez de interpretar texto libre, y un rol mal escrito falla al arrancar |
+| 3 | `forma` de GF-06 vale `null` porque el diseño no se la asigna; la llave ausente sí se rechaza | **Aprobada.** «No especificado por la fuente» y «se nos olvidó» son cosas distintas y deben distinguirse |
+| 4 | La banda de ácidos de GF-01 (2500–3300) es `indicio`, no `confirmacion` | **Aprobada, y es la más fina de las seis.** Si condicionara la detección, **los alcoholes y fenoles quedarían penalizados por no tener la banda de ácido**, que es justo lo que los distingue. Ese `indicio` no es decorativo: **R-4 lo consume** para exigir picos agudos antes de afirmar GF-03 dentro de la envolvente ancha de un ácido |
+| 5 | Los subtipos de C=O eran tres y podían estar incompletos | **Era un error del plan, ya corregido:** son **cinco** (sección 4). Añadir aldehído 1720–1740 y ácido carboxílico 1690–1760. La observación sobre la amida se documenta como limitación conocida, no se ensancha GF-05 |
+| 6 | `GRUPOS_ESPERADOS = 7` vive en el código, no en la configuración | **Aprobada.** Es el alcance (RF-04), no un parámetro. Configurable, alguien podría ponerlo en 6 y la validación aceptaría un catálogo al que le falta un grupo |
+
+**Correcciones que entran con esto:** los subtipos suben de tres a cinco, y **`enlace_vibracion` de los siete grupos sigue literalmente la columna de la sección 4** — «O–H estiramiento», «N–H estiramiento», … y «estiramiento del anillo» para GF-07. El campo se llama *enlace_vibracion* porque lleva las dos cosas: si guardara solo el símbolo, MOD-07 perdería el modo de vibración al redactar las explicaciones del incremento 4. Si entonces hiciera falta separarlo en dos campos, es un cambio de contrato que se discute ahí, no ahora.
+
+**Tres parámetros nuevos de UT-03 que T-15 necesita** (terreno de D-15, bloque `motor`). Dos de ellos **no se inventan: se miden**, y los cuatro archivos de calibración ya están en `datos/referencia/`:
+
+- **`tolerancia_banda_puntual_cm1`** — el margen alrededor de las bandas de un punto (`par`). Valor de arranque propuesto: **±15 cm⁻¹**, del orden del paso de la rejilla (≈3.5 cm⁻¹) más la dispersión real de posición entre equipos. Se recalibra con el split de validación, como los pesos.
+- **`ancho_media_altura_umbral_cm1`** — el corte de **R-1** entre el O–H ancho y el N–H angosto. Se mide en **1-butanol** (O–H ancho por puentes de hidrógeno) y **anilina** (N–H angosto, dos picos), y el umbral se pone entre ambos con su margen.
+- **`ancho_pico_agudo_max_cm1`** — el corte de **R-4**, que distingue un pico agudo y resuelto de un hombro ancho antes de afirmar GF-03 dentro de la envolvente de un ácido. Se mide en **ciclohexano** (C–H alifático agudo, sin nada más) y **ácido benzoico** (envolvente ancha de O–H sobre esa misma zona, sin ningún C–H alifático real). Son el par de calibración perfecto: el mismo tramo del espectro, uno con picos de verdad y el otro sin ninguno.
+
+**Las mediciones se hacen sobre el espectro ya normalizado por MOD-04**, no sobre el archivo crudo: es lo que el motor verá en ejecución, y medir en otra escala daría un umbral que no sirve.
+
+#### Resultado de la medición (T-15a, 24/11/2026) — evidencia en `docs/evidencia/d-20-anchos.md`
+
+**R-1 · `ancho_media_altura_umbral_cm1` = 175 cm⁻¹. Aprobado.**
+
+| Compuesto | Grupo | Ancho a media altura |
+|---|---|---|
+| 1-butanol | GF-01, O–H | 408.9 cm⁻¹ |
+| Anilina | GF-02, N–H | 74.0 cm⁻¹ |
+
+Margen de 2.3× a cada lado. Lo que da confianza en el número no es el margen sino la **verificación cruzada**: como R-1 vive en la zona traslapada 3300–3500, se midió cada banda **también en la región del otro grupo**. La anilina da 74.0 en las dos y el butanol varía un 1 % (408.9 / 404.0), es decir **el ancho no depende de dónde se mida**, que es justo lo que necesita una regla que opera en el traslape. El O–H de ácido del ácido benzoico sale aún más ancho (965.9 / 1099.6), en la dirección correcta.
+
+> **Límite conocido del calibrado:** hay **un solo ejemplo de cada clase**, y la anilina es una amina **primaria aromática**, el caso más angosto posible. GF-02 cubre «aminas **y amidas**», y un N–H de amida es bastante más ancho. **No hay ninguna amida en `datos/referencia/`**: el archivo que cerraría ese hueco es `acetamide`, que estaba en la prioridad 2 de D-12. Mientras no exista, R-1 queda calibrada contra el extremo angosto del grupo, y una amida podría clasificarse como O–H. Se revisa con el split de validación (D-15).
+
+**R-4 · `ancho_pico_agudo_max_cm1` = 160 cm⁻¹, medido al 80 % de la altura del pico (no al 50 %). Aprobado, con la definición que lo acompaña.**
+
+El agente no se quedó con los dos archivos prescritos: midió la misma zona en **todos** los espectros reales, y encontró que el método prescrito **no separa las dos clases**.
+
+| Compuesto | ¿C–H alifático? | @50 % | @80 % |
+|---|---|---|---|
+| Ciclohexano | Sí | 22.9 | 12.6 |
+| Tolueno | Sí | 184.4 | 16.5 |
+| Acetona | Sí | 145.4 | 19.5 |
+| Ciclohexeno | Sí | 44.7 | 22.1 |
+| 1-butanol | Sí | 152.9 | 118.3 |
+| Ácido benzoico | **No** | 305.3 | 216.5 |
+| Anilina | **No** | 760.5 | 639.2 |
+
+Con el corte al 50 %, los dos archivos prescritos sugerían ~84 cm⁻¹ — y ese umbral **habría negado el C–H alifático de la acetona y del tolueno**, que sí lo tienen y miden 145 y 184. El fallo es de la medida, no de la química: cuando la banda es débil, la media altura cae cerca de la línea base y el recorrido se funde con la estructura vecina (en el tolueno cruza en 3101.9, ya dentro del C–H aromático). Al 80 % los siete quedan bien clasificados por un solo corte.
+
+> **El punto apretado es el 1-butanol, en 118.3 frente al corte de 160: 1.35×, la mitad del margen de R-1.** Y tiene sentido que sea él: es el único de los «sí» que además lleva una envolvente ancha de O–H cuya cola pisa la región del C–H — es decir, **es el caso de R-4 en miniatura**. Si al crecer el conjunto ese margen se queda corto, el discriminante mejor no es otro ancho sino el **contraste pico-valle o el número de máximos resueltos** en 2850–2960: el C–H alifático son varios picos estrechos (≈2960, ≈2925, ≈2870) y una envolvente de ácido no tiene ninguno. Eso es literalmente lo que el catálogo quiere decir con «picos agudos». No se implementa ahora; queda anotado para cuando 160 dé problemas.
+
+**Disciplina que vale la pena conservar:** el agente **no fijó el umbral de R-4**, porque pasar del 50 % al 80 % cambia *cómo mide* la regla, y eso es diseño de T-15b, no medición. Dejó el valor en `null` y pidió aprobación de las dos cosas por separado: la definición y el número. Esa frontera es exactamente la correcta.
+
+#### Aprobado por el equipo el 24/11/2026 — qué se aplica antes de T-15b
+
+**1. UT-03, bloque `motor` — los tres valores quedan fijados y dejan de ser `SUPUESTO`:**
+
+| Clave | Valor | Nota |
+|---|---|---|
+| `tolerancia_banda_puntual_cm1` | **15** | Margen alrededor de las bandas de rango puntual con rol `par` (GF-07) |
+| `ancho_media_altura_umbral_cm1` | **175** | R-1. Ancho ≥ 175 → O–H; < 175 → N–H. Medido **al 50 %** de la altura |
+| `ancho_pico_agudo_max_cm1` | **160** | R-4. **Medido al 80 % de la altura del pico, no al 50 %.** La definición es parte del parámetro: usar el 50 % aquí invalida el número |
+
+> El nivel de medición **difiere entre las dos reglas a propósito** —R-1 al 50 %, R-4 al 80 %— y no es un descuido: al 50 % la métrica no separaba las clases de R-4, como demuestra la tabla de arriba. Quien implemente no debe «uniformar» los dos niveles.
+
+**2. UT-01 — `enlace_vibracion` de los seis grupos restantes** pasa a seguir literalmente la columna de la sección 4 («O–H estiramiento», «N–H estiramiento», «C–H estiramiento», «C≡N estiramiento», «C=O estiramiento», «C=C estiramiento»). GF-07 ya estaba alineado. Entra **en el commit de T-14**, que aún no está commiteado, para que UT-01 quede cerrado y coherente antes de que T-15b empiece a leerlo.
+
+**3. Pendiente de datos, no bloqueante:** añadir `acetamide` a la lista de descargas de D-12 — es el archivo que cierra el hueco de calibrado de R-1 (ninguna amida en el conjunto actual).
+
+---
+
 ## 2. Alcance y fronteras del incremento 3
 
 **Dentro:**
@@ -459,15 +535,21 @@ El incremento 2 confirmó dónde vive y cuánto vale: **`puntos_rejilla = 1024`*
 
 Tomados de Requerimientos V3.2 §6.2 y de MOD-06 §4. **Este es el único lugar del incremento donde estos números se escriben**; de aquí pasan a `grupos.json` y de ahí los lee todo lo demás.
 
-| ID | Grupo | Región principal (cm⁻¹) | Región acompañante (cm⁻¹) | Intensidad / forma |
-|---|---|---|---|---|
-| GF-01 | O–H (alcoholes, fenoles y ácidos) | 3200–3550 | ácidos: 2500–3300 | Fuerte, ancha |
-| GF-02 | N–H (aminas y amidas) | 3300–3500 | — | Media; más angosta que O–H; 2 picos (primarias), 1 (secundarias) |
-| GF-03 | C–H alifático (sp³) | 2850–2960 | — | Media; picos **agudos** justo por debajo de 3000 |
-| GF-04 | C≡N (nitrilos) | 2210–2260 | — | Media; pico agudo en zona casi siempre vacía |
-| GF-05 | C=O (carbonilo) | 1670–1780 | — | Fuerte y aguda; suele ser la señal más evidente |
-| GF-06 | C=C (alquenos) | 1620–1680 | =C–H 3020–3100 | Media / débil |
-| GF-07 | Anillo aromático | 1450–1600 (bandas ~1600 y ~1500) | C–H aromático 3000–3100 | Media; **par** de bandas |
+| ID | Grupo | **Enlace / vibración** | Región principal (cm⁻¹) | Región acompañante (cm⁻¹) | Intensidad / forma |
+|---|---|---|---|---|---|
+| GF-01 | O–H (alcoholes, fenoles y ácidos) | O–H estiramiento | 3200–3550 | ácidos: 2500–3300 | Fuerte, ancha |
+| GF-02 | N–H (aminas y amidas) | N–H estiramiento | 3300–3500 | — | Media; más angosta que O–H; 2 picos (primarias), 1 (secundarias) |
+| GF-03 | C–H alifático (sp³) | C–H estiramiento | 2850–2960 | — | Media; picos **agudos** justo por debajo de 3000 |
+| GF-04 | C≡N (nitrilos) | C≡N estiramiento | 2210–2260 | — | Media; pico agudo en zona casi siempre vacía |
+| GF-05 | C=O (carbonilo) | C=O estiramiento | 1670–1780 | — | Fuerte y aguda; suele ser la señal más evidente |
+| GF-06 | C=C (alquenos) | C=C estiramiento | 1620–1680 | =C–H 3020–3100 | Media / débil (**el diseño no le asigna forma**: el catálogo la deja en `null`, que es distinto de que falte) |
+| GF-07 | Anillo aromático | **estiramiento del anillo** | 1450–1600 (bandas ~1600 y ~1500) | C–H aromático 3000–3100 | Media; **par** de bandas |
+
+**Subtipos de C=O (GF-05) — los cinco de MOD-06 §4, informativos para el incremento 4:** cetona ~1715 · aldehído 1720–1740 · éster 1735–1750 · ácido carboxílico 1690–1760 · amida 1630–1700.
+
+> **Corrección del 23/11/2026 (error de este plan, no del código).** La versión 1.0 de este documento citaba los subtipos abreviados y con puntos suspensivos en la sección 2, y omitía la columna «Enlace / vibración» de MOD-06 §4. Un plan que es fuente de verdad no puede abreviar una lista: **ambas cosas quedan completas arriba**.
+>
+> **Y una inconsistencia real entre los documentos aprobados, que conviene conocer:** el subtipo **amida, 1630–1700**, cae parcialmente **por debajo** de la región principal de GF-05 (1670–1780). Una amida cuyo C=O esté en, digamos, 1650 cm⁻¹ queda **fuera de la región donde GF-05 se detecta**, y además cae dentro de GF-06 (1620–1680). La regla **R-2 impide que se reporte como alqueno** —una amida no tiene =C–H en 3020–3100, así que el score de GF-06 queda acotado—, de modo que el efecto es **una omisión, no un falso positivo**, que es el fallo menos grave de los dos. **No se ensancha GF-05**: cambiar un rango de §6.2 es un cambio de alcance. Queda documentado como limitación conocida y va a la revisión química de T-20.
 
 **Orden canónico de las etiquetas: GF-01, GF-02, GF-03, GF-04, GF-05, GF-06, GF-07.** Ese es el orden del vector binario de 7 posiciones del etiquetado y de la salida del CNN. Queda fijado aquí porque **T-16 y T-14 tienen que coincidir** y son tareas distintas, posiblemente de personas distintas: si el orden se decide dos veces, el modelo acierta con las etiquetas cruzadas y nadie lo nota hasta que el ácido benzoico reporte un nitrilo.
 
@@ -734,6 +816,7 @@ Los del Plan V3 Paso 8 para este incremento, más los que aparecen al detallarlo
 | **Mezcla de fases** en el dataset (gas vs condensada) | Alto | D-12: una sola fase, condensada; la fase se anota por archivo; los de fase gas se excluyen o se evalúan aparte |
 | **Desbalance de clases** (C≡N raro, C=O en todo) | Alto | T-16a cuenta el support por clase antes de entrenar; T-16c lo atiende explícitamente; T-16d lo reporta junto al F1 |
 | Traslape O–H/N–H y C=C/aromático (riesgo abierto n.º 6) | Medio | Reglas R-1 y R-2, con la banda acompañante como desempate; pruebas de regresión R-3 y R-4 |
+| **El C=O de amida (1630–1700) cae parcialmente fuera de GF-05 (1670–1780)** | Bajo | Limitación conocida, documentada en la sección 4. R-2 evita que se reporte como C=C, así que es omisión y no falso positivo. Se revisa en T-20 con criterio químico; **no se ensancha GF-05 sin aprobación**, porque es §6.2 |
 | **Deriva entre el preprocesamiento de entrenamiento y el de producción** (MOD-06 §11) | Alto | T-16b: el entrenamiento importa la normalización real de MOD-04, y una prueba lo demuestra |
 | **Cruce del orden de etiquetas** entre T-14 y T-16 | Alto | El orden canónico queda fijado en la sección 4 de este plan, una sola vez |
 | Pesos de la fusión mal calibrados (una vía domina a la otra) | Medio | Arrancar en 0.5/0.5; recalibrar **solo** con el split de validación (D-15) |
