@@ -39,6 +39,35 @@ def aceptado(nombre: str, bytes_leidos: int) -> dict[str, Any]:
     return {"valido": True, "nombre": nombre, "bytes": bytes_leidos}
 
 
+#: Decimales con que viajan el eje y la intensidad. Seis alcanzan de sobra
+#: para la gráfica y dejan la respuesta en unas pocas decenas de kilobytes.
+DECIMALES_ESPECTRO: int = 6
+
+
+def procesado(nombre: str, espectro: Any) -> dict[str, Any]:
+    """El cuerpo de `POST /api/procesar` cuando MOD-04 terminó (incremento 2).
+
+    Lleva el espectro **normalizado** del contrato de MOD-06 §5: el eje de la
+    rejilla fija de 4000 a 400 cm⁻¹ y la intensidad entre 0 y 1. No es el
+    archivo ni sus valores originales, así que RNF-09 se sigue cumpliendo:
+    lo que se subió no sale del servidor.
+
+    Args:
+        nombre: el nombre ya limpio que entregó MOD-02.
+        espectro: el `EspectroProcesado` de MOD-04.
+    """
+    return {
+        "valido": True,
+        "nombre": nombre,
+        "espectro": {
+            "eje_cm1": [round(x, DECIMALES_ESPECTRO) for x in espectro.eje_cm1],
+            "intensidad": [round(y, DECIMALES_ESPECTRO) for y in espectro.intensidad],
+            "rango_medido_cm1": list(espectro.rango_medido_cm1),
+            "unidad_original": espectro.unidad_original,
+        },
+    }
+
+
 def rechazado(
     codigo: str, configuracion: Configuracion | None = None
 ) -> dict[str, Any]:

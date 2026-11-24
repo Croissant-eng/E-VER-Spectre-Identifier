@@ -6,10 +6,11 @@ números. Las dos tareas la necesitan —T-04 mira las primeras filas para saber
 si el archivo tiene esta forma, T-05 las recorre todas para contar y medir— y
 tenerla dos veces sería tener dos reglas que se separan con el tiempo.
 
-**Esto no es el «lector de espectro» de D-2.** D-2 es la decisión de compartir
-un lector entre MOD-03 y MOD-04, y es del incremento 2. Lo de aquí es reparto
-interno de MOD-03: no normaliza, no ordena, no convierte y nadie fuera de
-`backend/validacion/` lo usa.
+Desde el incremento 2 la lectura de bajo nivel (extensión, separador,
+encabezado y pares del CSV) vive en `backend/nucleo/lector_espectro.py`, que es
+el lector compartido de D-2: así MOD-03 y MOD-04 leen el archivo de la misma
+manera. Aquí se queda lo que es solo de MOD-03: las capas, el veredicto y la
+forma en que una lectura fallida se vuelve un rechazo.
 """
 
 from __future__ import annotations
@@ -17,6 +18,18 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from backend.nucleo import lector_espectro
+from backend.nucleo.lector_espectro import (
+    COLUMNAS_CSV,
+    EXTENSION_CSV,
+    EXTENSION_JDX,
+    SEPARADOR_COMA,
+    SEPARADOR_PUNTO_Y_COMA,
+    SEPARADORES,
+    extension_de,
+    par_de,
+    separador_de,
+)
 from backend.utilerias import mensajes
 
 # --------------------------------------------------------------------------- #
@@ -65,22 +78,8 @@ CODIGO_POR_CAPA: dict[str, str] = {
 # escrito un archivo de dos columnas».
 # --------------------------------------------------------------------------- #
 
-#: Los dos formatos que MOD-03 sabe revisar hoy. UT-03 decide cuáles se
-#: *admiten*; esto es lo que este módulo sabe *inspeccionar*.
-EXTENSION_JDX: str = ".jdx"
-EXTENSION_CSV: str = ".csv"
-
-#: Los dos separadores que admite Requerimientos §6.1. La coma va primero:
-#: gana los empates al adivinar cuál usa un archivo.
-SEPARADOR_COMA: str = ","
-SEPARADOR_PUNTO_Y_COMA: str = ";"
-SEPARADORES: tuple[str, ...] = (SEPARADOR_COMA, SEPARADOR_PUNTO_Y_COMA)
-
 #: Nombre anterior del separador, cuando solo se admitía la coma.
 SEPARADOR_CSV: str = SEPARADOR_COMA
-
-#: Un par es «número de onda, intensidad»: dos columnas, ni una más.
-COLUMNAS_CSV: int = 2
 
 #: El piso de lo que puede llamarse espectro: con un solo punto no hay curva.
 #: **No es el mínimo de UT-03** (eso lo aplica T-05, con su propio mensaje).
@@ -136,22 +135,6 @@ class Fallo:
 # --------------------------------------------------------------------------- #
 
 
-def extension_de(nombre: str | None) -> str | None:
-    """La extensión del nombre, en minúsculas y con punto.
-
-    Devuelve ``None`` cuando no hay extensión que valga: sin punto
-    (``"espectro"``), con el punto al final (``"espectro."``) o cuando el punto
-    abre el nombre (``".csv"``, que es un archivo oculto sin nombre, no un
-    espectro llamado «csv»).
-    """
-    if not nombre:
-        return None
-    punto = nombre.rfind(".")
-    if punto <= 0 or punto == len(nombre) - 1:
-        return None
-    return nombre[punto:].lower()
-
-
 # --------------------------------------------------------------------------- #
 # Lectura ligera de un `.csv`
 # --------------------------------------------------------------------------- #
@@ -172,60 +155,12 @@ class FilasCsv:
     encabezado: bool
 
 
-def separador_de(contenido: str) -> str:
-    """Adivina con qué separador está escrito el `.csv`.
-
-    Requerimientos §6.1 admite **coma o punto y coma**, así que hay que
-    averiguar cuál usa el archivo antes de leerlo. La regla es simple y
-    explicable: gana el separador que parta la primera fila con contenido en
-    exactamente dos columnas. Si ninguno lo logra se devuelve la coma, y la
-    lectura falla con un motivo claro; si lo logran los dos, gana la coma.
-
-    La primera fila sirve para esto incluso cuando es un encabezado: el
-    encabezado usa el mismo separador que los datos.
-    """
-    primera = next((linea for linea in contenido.splitlines() if linea.strip()), "")
-    for separador in SEPARADORES:
-        if len(primera.split(separador)) == COLUMNAS_CSV:
-            return separador
-    return SEPARADOR_COMA
-
-
-def par_de(campos: list[str], separador: str) -> tuple[float, float] | None:
-    """El par «número de onda, intensidad» de una fila, o ``None`` si no lo es.
-
-    Con punto y coma, los campos pueden traer **decimal con coma** —así exporta
-    Excel en español: `400,0;0,805`— y se cambia por punto antes de leerlos.
-    Con coma como separador, el decimal es el punto, porque `400,0` ya se
-    partió en dos campos.
-
-    Aquí solo se confirma que el archivo **parece** pares de números; la
-    conversión que de verdad se usa para graficar y analizar es de MOD-04
-    (incremento 2).
-    """
-    if len(campos) != COLUMNAS_CSV:
-        return None
-
-    valores: list[float] = []
-    for campo in campos:
-        texto = campo.strip()
-        if separador == SEPARADOR_PUNTO_Y_COMA:
-            texto = texto.replace(SEPARADOR_COMA, ".")
-        try:
-            valores.append(float(texto))
-        except ValueError:
-            return None
-
-    return valores[0], valores[1]
-
-
 def leer_csv(contenido: str, *, maximo_filas: int | None = None) -> FilasCsv | Fallo:
-    """Lee las filas de un `.csv` de dos columnas.
+    """Lee las filas de un `.csv` de dos columnas con el lector compartido (D-2).
 
-    Se admite **una fila de encabezado** al principio (`onda,intensidad`), que
-    es lo que exporta casi cualquier programa y lo que Requerimientos §6.1
-    permite. La segunda fila que no sean números ya es un archivo que no tiene
-    esta forma, y un título suelto —una sola columna— no cuenta como encabezado.
+    Se admite **una fila de encabezado** al principio, como permite
+    Requerimientos §6.1. Si la lectura falla, el motivo queda como `Fallo` de
+    la capa de estructura.
 
     Args:
         contenido: el archivo como texto.
@@ -236,39 +171,11 @@ def leer_csv(contenido: str, *, maximo_filas: int | None = None) -> FilasCsv | F
     Returns:
         Las `FilasCsv`, o el `Fallo` de la primera fila que no encaja.
     """
-    separador = separador_de(contenido)
-    pares: list[tuple[float, float]] = []
-    encabezado = False
-
-    for linea in contenido.splitlines():
-        if not linea.strip():
-            continue
-
-        campos = linea.split(separador)
-        par = par_de(campos, separador)
-
-        if par is None:
-            # El cupo del encabezado: solo la primera fila, y solo si trae el
-            # número de columnas correcto.
-            if not pares and not encabezado and len(campos) == COLUMNAS_CSV:
-                encabezado = True
-                continue
-            if len(campos) != COLUMNAS_CSV:
-                return Fallo(
-                    CAPA_ESTRUCTURA,
-                    "una fila no trae dos columnas separadas por "
-                    f"«{separador}»",
-                )
-            return Fallo(CAPA_ESTRUCTURA, "una fila no trae un par de números")
-
-        pares.append(par)
-        if maximo_filas is not None and len(pares) >= maximo_filas:
-            break
-
-    if not pares:
-        return Fallo(CAPA_ESTRUCTURA, "el archivo no trae ni una fila de datos")
-
-    return FilasCsv(tuple(pares), separador, encabezado)
+    try:
+        tabla = lector_espectro.leer_tabla_csv(contenido, maximo_filas=maximo_filas)
+    except lector_espectro.LecturaFallida as error:
+        return Fallo(CAPA_ESTRUCTURA, str(error))
+    return FilasCsv(tabla.pares, tabla.separador, bool(tabla.encabezado))
 
 
 def coherencia(pares: tuple[tuple[float, float], ...]) -> Fallo | None:

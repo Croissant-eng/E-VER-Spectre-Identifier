@@ -77,6 +77,31 @@
           <p class="nota" id="nota-analizar" hidden></p>
         </div>
       </section>
+
+      <!--
+        MOD-05 (incremento 2). La sección nace escondida y solo se muestra
+        después de aprobar un archivo. Si MOD-04 no devuelve un espectro, en
+        lugar de la gráfica va el mensaje de UT-02: nunca una gráfica vacía
+        (CA-04.3).
+      -->
+      <section
+        class="tarjeta grafica"
+        id="grafica"
+        aria-live="polite"
+        hidden
+      >
+        <h2 class="grafica-encabezado">Espectro</h2>
+        <p class="grafica-aviso-titulo" id="grafica-titulo" hidden></p>
+        <p class="grafica-mensaje" id="grafica-mensaje" hidden></p>
+        <p class="grafica-accion" id="grafica-accion" hidden></p>
+        <div class="grafica-contenedor" id="grafica-contenedor" hidden>
+          <canvas
+            id="grafica-lienzo"
+            role="img"
+            aria-label="Gráfica del espectro infrarrojo"
+          ></canvas>
+        </div>
+      </section>
     </main>
 
     <footer class="pie">
@@ -86,6 +111,9 @@
       </p>
     </footer>
 
+    <!-- D-1: Chart.js y su complemento de anotaciones, guardados en el repositorio. -->
+    <script src="../vendor/chart.umd.js"></script>
+    <script src="../vendor/chartjs-plugin-annotation.min.js"></script>
     <script type="module" src="interfaz.js"></script>
   </body>
 </html>

@@ -157,6 +157,10 @@ def _preparar_copia(destino: Path) -> None:
 
     shutil.copytree(FRONTEND / "interfaz", destino / "interfaz")
     shutil.copytree(FRONTEND / "servicios", destino / "servicios")
+    # Desde el incremento 2 la interfaz importa la gráfica y sus librerías.
+    for carpeta in ("visor-espectro", "vendor"):
+        if (FRONTEND / carpeta).is_dir():
+            shutil.copytree(FRONTEND / carpeta, destino / carpeta)
 
     if not ESPECTRO.is_file():
         raise SystemExit(

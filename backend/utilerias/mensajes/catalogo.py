@@ -62,6 +62,24 @@ LECTURA_INTERRUMPIDA = "LECTURA_INTERRUMPIDA"
 #: es justo lo que no debe salir del servidor.
 FALLO_INTERNO = "FALLO_INTERNO"
 
+#: El archivo pasó la validación, pero sus datos no se pudieron leer con
+#: seguridad en MOD-04: compresión que no se reconoce, unidades que no son las
+#: de un espectro infrarrojo o un número de puntos que no cuadra (T-08).
+DATOS_ILEGIBLES = "DATOS_ILEGIBLES"
+
+#: La intensidad del espectro es constante, una línea plana, y no hay nada que
+#: analizar (T-11, CA-03.3).
+SIN_SENAL = "SIN_SENAL"
+
+#: La intensidad viene en una unidad que no es transmitancia ni absorbancia,
+#: por ejemplo reflectancia (D-10).
+UNIDAD_NO_SOPORTADA = "UNIDAD_NO_SOPORTADA"
+
+#: Un CSV sin encabezado con todos sus valores entre 0 y 1: puede ser
+#: transmitancia en fracción o absorbancia, y adivinar mal invierte el
+#: espectro, así que se pide nombrar la unidad (D-11).
+UNIDAD_SIN_DECLARAR = "UNIDAD_SIN_DECLARAR"
+
 
 class CodigoDesconocido(Exception):
     """Se pidió un código que no está en el catálogo.
@@ -213,6 +231,57 @@ _CATALOGO: dict[str, _Entrada] = {
         accion=lambda c: (
             "Vuelva a intentarlo en un momento; si sigue ocurriendo, avise al "
             "equipo del proyecto."
+        ),
+    ),
+    # Incremento 2, lectura completa en MOD-04 (T-08).
+    DATOS_ILEGIBLES: _Entrada(
+        titulo="No se pudieron leer los datos del espectro",
+        texto=lambda c: (
+            "El archivo tiene la estructura correcta, pero sus datos vienen en "
+            "una forma o en unas unidades que la aplicación no reconoce."
+        ),
+        accion=lambda c: (
+            "Exporte el espectro otra vez, en número de onda y con la "
+            "intensidad en transmitancia o absorbancia, y vuelva a subirlo."
+        ),
+    ),
+    # Incremento 2, línea plana (T-11). CA-03.3 pide decir que no hay señal
+    # analizable.
+    SIN_SENAL: _Entrada(
+        titulo="Sin señal analizable",
+        texto=lambda c: (
+            "El espectro no contiene señal analizable: su intensidad es la "
+            "misma en todos los puntos."
+        ),
+        accion=lambda c: (
+            "Revise que exportó la medición correcta y que el equipo registró "
+            "la muestra, y vuelva a subir el archivo."
+        ),
+    ),
+    # Incremento 2, unidad de la intensidad (D-10 y D-11).
+    UNIDAD_NO_SOPORTADA: _Entrada(
+        titulo="Unidad de intensidad no admitida",
+        texto=lambda c: (
+            "La intensidad del espectro no viene en transmitancia ni en "
+            "absorbancia, que son las dos unidades que la aplicación sabe "
+            "analizar."
+        ),
+        accion=lambda c: (
+            "Exporte el espectro en transmitancia o en absorbancia y vuelva a "
+            "subirlo."
+        ),
+    ),
+    UNIDAD_SIN_DECLARAR: _Entrada(
+        titulo="No se sabe en qué unidad viene la intensidad",
+        texto=lambda c: (
+            "El archivo no tiene encabezado y todos sus valores están entre 0 "
+            "y 1, así que pueden ser transmitancia o absorbancia. Tomar una "
+            "por otra invertiría el espectro."
+        ),
+        accion=lambda c: (
+            "Agregue una primera fila de encabezado que nombre la unidad, por "
+            "ejemplo «numero_de_onda,transmitancia» o "
+            "«numero_de_onda,absorbancia», y vuelva a subir el archivo."
         ),
     ),
 }

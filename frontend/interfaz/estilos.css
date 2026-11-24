@@ -221,6 +221,48 @@ h1 {
   color: var(--rechazado);
 }
 
+/* MOD-05, la gráfica del espectro (incremento 2). El contenedor le da la
+   altura y el ancho; Chart.js llena el lienzo y lo ajusta solo cuando cambia
+   el ancho de la pantalla (CA-04.2). */
+.grafica-encabezado {
+  margin: 0 0 0.6rem;
+  font-size: 1.1rem;
+}
+
+.grafica-contenedor {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  height: 18rem;
+}
+
+.grafica-contenedor canvas {
+  display: block;
+  max-width: 100%;
+}
+
+.grafica-aviso-titulo {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+}
+
+.grafica-mensaje {
+  margin: 0 0 0.4rem;
+}
+
+.grafica-accion {
+  margin: 0;
+  font-weight: 600;
+}
+
+.grafica[data-estado="sin-espectro"] {
+  border-color: var(--rechazado);
+}
+
+.grafica[data-estado="sin-espectro"] .grafica-aviso-titulo {
+  color: var(--rechazado);
+}
+
 .bloque-analizar {
   display: flex;
   flex-direction: column;

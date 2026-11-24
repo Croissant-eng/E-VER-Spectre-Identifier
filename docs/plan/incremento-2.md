@@ -127,3 +127,28 @@ Este incremento **sí usa los espectros reales** (el incremento 1 solo fabricado
 - **Umbral y pesos de fusión** (0.6; wR/wML) ya están en UT-03; se recalibran con validación.
 - **Dataset de SDBS/NIST para entrenar MOD-06** (riesgo abierto): conseguir y etiquetar, reservar un subconjunto de prueba independiente (RNF-08). Faltan espectros con **C≡N (GF-04)** y **C=C (GF-06)**, que ningún compuesto de T-0R cubre.
 - **Plan B del motor:** si el CNN no alcanza F1 ≥ 0.80 a tiempo, entregar con `wML = 0` (solo reglas) sin cambiar el contrato.
+
+## 11. Registro de lo implementado
+
+Esta sección se agregó al terminar el incremento. Dice cómo quedaron las decisiones de arriba en el código y qué se resolvió por el camino. Lo marcado como SUPUESTO falta que el equipo lo confirme.
+
+**D-2, ruta del lector.** El lector compartido quedó en `backend/nucleo/lector_espectro.py`. Tiene la extensión, el separador, el encabezado y los pares del CSV, y las etiquetas y el bloque de datos del JCAMP-DX. `backend/validacion/comun.py` sigue existiendo para MOD-03, pero ahora toma su lectura de ahí, igual que `backend/preprocesamiento/lector.py`. Una prueba revisa que los dos módulos saquen los mismos pares del mismo archivo.
+
+**D-10.** MOD-04 rechaza con `UNIDAD_NO_SOPORTADA` cualquier `##YUNITS=` que no sea transmitancia ni absorbancia.
+
+**D-11.** El código nuevo de UT-02 para el CSV ambiguo se llama `UNIDAD_SIN_DECLARAR` y le pide a la persona agregar un encabezado con la unidad. Consecuencia: `espectro-valido-900-puntos.csv` y `espectro-punto-y-coma.csv`, que no traen encabezado y tienen todos sus valores entre 0 y 1, pasan la validación de MOD-03 pero MOD-04 los rechaza por esta regla. Las pruebas de MOD-04 usan `espectro-con-encabezado.csv` y la línea plana ahora trae encabezado.
+
+**Ruta nueva, `POST /api/procesar`.** El plan no decía cómo llega el espectro a la página. Se agregó una ruta aparte que recibe el mismo archivo, lo pasa por MOD-02, MOD-03 y MOD-04 y devuelve `{valido, nombre, espectro}`, donde `espectro` trae `eje_cm1`, `intensidad`, `rango_medido_cm1` y `unidad_original`. Así el contrato D-5 de `/api/validar` no cambia. Como el archivo no se guarda (RNF-09), la página lo manda dos veces. Si el equipo prefiere que `/api/validar` devuelva también el espectro, el cambio es pequeño, pero toca el contrato cerrado del incremento 1.
+
+**D-1.** Chart.js 4.4.7 y chartjs-plugin-annotation 3.1.0 quedaron en `frontend/vendor/` con su licencia y su huella SHA-256 en `frontend/vendor/LEEME.md`. La configuración de la gráfica es una función pura en `frontend/visor-espectro/configuracion.js`, probada con `node --test`. El complemento de anotaciones queda registrado y vacío para el incremento 4. La prueba de MOD-01 que busca direcciones de internet en el frontend ahora se salta `frontend/vendor/`, porque los comentarios de licencia traen la dirección del proyecto.
+
+**Contrato de la sección 3.** La rejilla tiene 1024 puntos y va de 4000 a 400 cm⁻¹. Los dos valores viven en UT-03, en `procesamiento.puntos_rejilla` y `procesamiento.rango_rejilla_cm1`. El 1024 sale del ejemplo del diseño de MOD-06 y es SUPUESTO.
+
+**Otros SUPUESTOS de MOD-04.**
+- Una transmitancia declarada en el encabezado con algún valor mayor que 1.5 se toma como porcentaje.
+- Una transmitancia de cero o negativa se sube a una millonésima antes del logaritmo.
+- Fuera del tramo que midió el archivo, la rejilla queda en cero y la respuesta dice cuál fue el tramo medido. La gráfica solo dibuja ese tramo.
+
+**Evidencia.** `python -m herramientas.capturar_grafica` sube los archivos contra la aplicación real, revisa el DOM antes de fotografiar y mide el ancho a 360 px. Las capturas quedan en `docs/evidencia/t-12-*` y `t-13-*`. Resultado: `ancho=345 contenido=345 desborda=no`; el marco es de 360 y la barra de desplazamiento vertical ocupa el resto.
+
+**Pendiente.** La prueba de T-08 con un `.jdx` real de NIST se salta cuando el archivo no está en `datos/referencia/`. Desde la nube no se pudo descargar; hay que correrla en una computadora del equipo después de `python -m herramientas.descargar_espectros_nist`. Las dos pruebas de RNF-09 de MOD-02 sobre el archivo temporal fallan en Linux desde el incremento 1; no se tocaron.

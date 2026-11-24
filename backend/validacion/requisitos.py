@@ -38,6 +38,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from backend.nucleo.lector_espectro import valor_de_etiqueta
 from backend.utilerias.configuracion import Configuracion
 from backend.validacion.comun import (
     CAPA_ESTRUCTURA,
@@ -57,10 +58,6 @@ from backend.validacion.comun import (
 ETIQUETA_PUNTOS: str = "##NPOINTS="
 ETIQUETA_PRIMERA_X: str = "##FIRSTX="
 ETIQUETA_ULTIMA_X: str = "##LASTX="
-
-#: Lo que separa un comentario del valor, dentro de una línea de etiqueta.
-_COMENTARIO: str = "$$"
-
 
 @dataclass(frozen=True)
 class Medida:
@@ -199,15 +196,10 @@ def _medir_jdx(contenido: str) -> Medida | Fallo:
 def _valor_de_etiqueta(contenido: str, etiqueta: str) -> str | None:
     """El valor de una etiqueta del encabezado, sin su comentario.
 
-    No distingue mayúsculas y tolera espacios y un comentario `$$` al final,
-    que es como aparecen en los archivos reales.
+    Lo lee el lector compartido de D-2, el mismo que usa MOD-04, para que los
+    dos módulos entiendan igual el encabezado del archivo.
     """
-    for linea in contenido.splitlines():
-        desnuda = linea.strip()
-        if desnuda.upper().startswith(etiqueta):
-            valor = desnuda[len(etiqueta) :]
-            return valor.split(_COMENTARIO)[0].strip()
-    return None
+    return valor_de_etiqueta(contenido, etiqueta)
 
 
 def _entero(crudo: str | None, etiqueta: str) -> int | Fallo:

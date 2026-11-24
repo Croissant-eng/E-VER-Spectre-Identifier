@@ -150,6 +150,13 @@ CODIGOS_ESPERADOS = (
     mensajes.LECTURA_INTERRUMPIDA,
     # El genérico del 500, que la sección 5 dejaba pendiente (T-07).
     mensajes.FALLO_INTERNO,
+    # Agregado por T-08 para la lectura completa de MOD-04.
+    mensajes.DATOS_ILEGIBLES,
+    # Agregado por T-11 para la línea plana (CA-03.3).
+    mensajes.SIN_SENAL,
+    # Agregados para la unidad de la intensidad (D-10 y D-11).
+    mensajes.UNIDAD_NO_SOPORTADA,
+    mensajes.UNIDAD_SIN_DECLARAR,
 )
 
 

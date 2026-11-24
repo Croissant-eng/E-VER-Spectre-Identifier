@@ -20,11 +20,14 @@ from backend.api.aplicacion import (
     CODIGO_FALLO_INTERNO,
     CODIGO_PETICION_INVALIDA,
     RUTA_INTERFAZ,
+    RUTA_LIBRERIAS,
+    RUTA_PROCESAR,
     RUTA_SERVICIOS,
     RUTA_VALIDAR,
+    RUTA_VISOR,
     crear_aplicacion,
 )
-from backend.api.veredicto import aceptado, rechazado
+from backend.api.veredicto import aceptado, procesado, rechazado
 
 __all__ = [
     "CAMPO_ARCHIVO",
@@ -32,9 +35,13 @@ __all__ = [
     "CODIGO_FALLO_INTERNO",
     "CODIGO_PETICION_INVALIDA",
     "RUTA_INTERFAZ",
+    "RUTA_LIBRERIAS",
+    "RUTA_PROCESAR",
     "RUTA_SERVICIOS",
     "RUTA_VALIDAR",
+    "RUTA_VISOR",
     "aceptado",
     "crear_aplicacion",
+    "procesado",
     "rechazado",
 ]
