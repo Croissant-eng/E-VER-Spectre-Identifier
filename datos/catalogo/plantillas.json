@@ -1,0 +1,66 @@
+{
+  "_descripcion": "UT-01. Plantillas de explicación de los siete grupos (T-20). Aquí solo va el porqué. La región, la posición observada y el rasgo los arma MOD-07 con los números del catálogo grupos.json, para que cada número viva en un solo lugar. Por eso estos textos no llevan cifras: donde hace falta nombrar una región acompañante se escribe {confirmacion} y MOD-07 pone el rango del catálogo.",
+  "_revision": "SUPUESTO. Borrador escrito con ayuda de IA el 24 de noviembre de 2026. Falta lo que pide el plan para T-20: comparar cada plantilla contra la tabla de la University of Colorado Boulder y contra LibreTexts, que la apruebe quien no la escribió y, si se puede, que la revise un profesor de química. Al revisarla, llenen revisado_por y fecha_revision.",
+  "version": "1.0",
+  "plantillas": [
+    {
+      "grupo": "GF-01",
+      "por_que": "El hidrógeno del O–H forma puentes de hidrógeno con las moléculas vecinas. Cada puente cambia un poco la fuerza del enlace, así que en lugar de un pico delgado aparece una banda ancha que junta muchas frecuencias parecidas. En los ácidos carboxílicos los puentes son todavía más fuertes y la banda se ensancha tanto que puede tapar a las señales del C–H.",
+      "distincion": null,
+      "fuentes": ["University of Colorado Boulder, Table of Characteristic IR Absorptions", "LibreTexts, Infrared Spectroscopy"],
+      "revisado_por": null,
+      "fecha_revision": null
+    },
+    {
+      "grupo": "GF-02",
+      "por_que": "El N–H vibra en una zona que comparte con el O–H, pero forma puentes de hidrógeno más débiles, y por eso sus bandas son más angostas y de intensidad media. Las aminas primarias muestran dos picos, uno por cada enlace N–H, y las secundarias muestran uno solo.",
+      "distincion": {
+        "frente_a": "GF-01",
+        "texto": "Se atribuyó a N–H y no a O–H porque la banda observada es más angosta: una banda de O–H en la misma zona sería mucho más ancha por sus puentes de hidrógeno."
+      },
+      "fuentes": ["University of Colorado Boulder, Table of Characteristic IR Absorptions", "LibreTexts, Infrared Spectroscopy"],
+      "revisado_por": null,
+      "fecha_revision": null
+    },
+    {
+      "grupo": "GF-03",
+      "por_que": "Los enlaces C–H de un carbono que solo tiene enlaces sencillos vibran un poco más despacio que los de un doble enlace o un anillo aromático, así que quedan justo por debajo de ellos. Casi todas las moléculas orgánicas tienen alguno, por eso estos picos agudos son muy comunes.",
+      "distincion": null,
+      "fuentes": ["University of Colorado Boulder, Table of Characteristic IR Absorptions", "LibreTexts, Infrared Spectroscopy"],
+      "revisado_por": null,
+      "fecha_revision": null
+    },
+    {
+      "grupo": "GF-04",
+      "por_que": "El triple enlace entre carbono y nitrógeno es muy rígido, así que vibra a una frecuencia que casi ningún otro enlace comparte. Por eso un pico agudo en esta zona, que casi siempre está vacía, apunta con mucha seguridad a un nitrilo.",
+      "distincion": null,
+      "fuentes": ["University of Colorado Boulder, Table of Characteristic IR Absorptions", "LibreTexts, Infrared Spectroscopy"],
+      "revisado_por": null,
+      "fecha_revision": null
+    },
+    {
+      "grupo": "GF-05",
+      "por_que": "El doble enlace entre carbono y oxígeno es muy polar: al estirarse cambia mucho la distribución de carga de la molécula, y eso produce una absorción muy intensa. Como el enlace es fuerte y no forma puentes de hidrógeno que lo ensanchen, el pico además es agudo. Esa combinación es la firma del carbonilo, y su posición exacta ayuda a saber si es una cetona, un aldehído, un éster, un ácido o una amida.",
+      "distincion": null,
+      "fuentes": ["University of Colorado Boulder, Table of Characteristic IR Absorptions", "LibreTexts, Infrared Spectroscopy"],
+      "revisado_por": null,
+      "fecha_revision": null
+    },
+    {
+      "grupo": "GF-06",
+      "por_que": "El doble enlace entre dos carbonos es poco polar, por eso su señal es débil o mediana. Para atribuirla a un alqueno hace falta además el C–H del carbono con doble enlace, que aparece {confirmacion}. Sin esa segunda señal, la banda podría ser de un anillo aromático o de otro enlace.",
+      "distincion": null,
+      "fuentes": ["University of Colorado Boulder, Table of Characteristic IR Absorptions", "LibreTexts, Infrared Spectroscopy"],
+      "revisado_por": null,
+      "fecha_revision": null
+    },
+    {
+      "grupo": "GF-07",
+      "por_que": "Los enlaces del anillo aromático vibran juntos y dan un par de bandas en esta región, en lugar de un solo pico. Ese par, junto con el C–H aromático que aparece {confirmacion}, es lo que distingue al anillo de un alqueno sencillo.",
+      "distincion": null,
+      "fuentes": ["University of Colorado Boulder, Table of Characteristic IR Absorptions", "LibreTexts, Infrared Spectroscopy"],
+      "revisado_por": null,
+      "fecha_revision": null
+    }
+  ]
+}

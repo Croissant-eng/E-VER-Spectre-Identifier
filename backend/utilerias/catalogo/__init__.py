@@ -30,8 +30,24 @@ from backend.utilerias.catalogo.lector import (
     obtener,
     recargar,
 )
+from backend.utilerias.catalogo.plantillas import (
+    MARCAS_PERMITIDAS,
+    RUTA_PLANTILLAS,
+    Distincion,
+    Plantilla,
+    Plantillas,
+    cargar_plantillas,
+    obtener_plantillas,
+)
 
 __all__ = [
+    "MARCAS_PERMITIDAS",
+    "RUTA_PLANTILLAS",
+    "Distincion",
+    "Plantilla",
+    "Plantillas",
+    "cargar_plantillas",
+    "obtener_plantillas",
     "BANDAS_DEL_PAR",
     "CARPETA",
     "GRUPOS_ESPERADOS",
