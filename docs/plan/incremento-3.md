@@ -1,0 +1,806 @@
+# Incremento 3 (C) — Identificar grupos funcionales
+
+**Proyecto:** E-VER Spectre Identifier · **Equipo:** E-VER (Electronic-Versions) — Sergio Uriel Bustamante Bustos, Julio Antonio Jiménez Jiménez
+**Módulos nuevos:** MOD-06 (Motor de identificación) y UT-01 (Catálogo de grupos funcionales)
+**RF / HU:** RF-04 / HU-05 y RF-07 / HU-08 · **RNF:** RNF-08 (calidad del motor), RNF-02 (≤ 5 s), RNF-04 (modularidad)
+**Criterios de aceptación:** CA-05.1 … CA-05.4 y CA-08.1 … CA-08.3
+**Tareas del Plan V3:** T-14 … T-19 (más T-3R, de datos)
+**Hitos:** H8 → H9 → H10
+**Depende de:** Incremento 2 cerrado (H7) — MOD-04 entrega el espectro normalizado
+**Versión de este plan:** 1.6 (23/11/2026) · **Estado:** **D-12 a D-19 cerradas. Sin supuestos bloqueantes.** El contrato de `/api/procesar` y N = 1024 llegaron confirmados del incremento 2; los siete grupos tienen espectro de referencia. **T-14 y T-15 pueden arrancar ya**; T-16 arranca en paralelo en cuanto T-3R entregue el conjunto.
+
+---
+
+## 0. Cómo leer este documento
+
+Este plan **no agrega requerimientos**. Todo lo que contiene se deriva de cuatro documentos aprobados, y cuando los cita lo hace por sección:
+
+| Documento | Versión | Qué aporta a este incremento |
+|---|---|---|
+| Requerimientos y Matriz | V3.2 | RF-04, RF-07, RNF-08, RNF-02; §6.1 parámetros; §6.2 los 7 grupos; §10 criterios CA-05 y CA-08; §11 trazabilidad; §13 riesgo abierto n.º 4 y n.º 6 |
+| Diseño detallado de MOD-06 | v2 | §2 enfoque híbrido; §4 tabla de correlación; §5 **contrato de datos (fuente única)**; §6 fusión y umbral; §7 datos y entrenamiento; §8 evaluación; §9 aislamiento; §10 plan B; §11 riesgos |
+| Plan de Implementación | V3 | Paso 3 secuencia e interfaces; Paso 4 tareas T-14…T-19; Paso 6 pruebas; Paso 7 hitos y sobrecarga; Paso 8 riesgos |
+| Persistencia de datos | v2 | Catálogo JSON y modelo entrenado como archivos de **solo lectura** a través de UT-01; sin base de datos |
+
+**Reglas que siguen vigentes del incremento 1 y 2:**
+
+- Una tarea, un commit. Parar en cada hito (H8, H9, H10) antes de seguir.
+- Marcar `SUPUESTO` lo no confirmado, en vez de inventarlo. En este documento los supuestos van señalados en línea.
+- Nada «hardcodeado»: los valores salen de UT-03, los mensajes de UT-02, los números de los grupos de UT-01.
+- Fronteras explícitas en cada tarea: qué NO se toca.
+- Pruebas sin red: ninguna prueba descarga nada; corren offline.
+- Pruebas de mutación: romper el código a propósito y confirmar que una prueba revienta.
+- Evidencia que se mide, no que se cree.
+
+El Plan V3 autoriza este ajuste: dice que los incrementos 2 a 5 «se revisarán al iniciarlos, ajustando lo que se aprenda del incremento anterior», y que los responsables se asignan al arrancar cada uno.
+
+---
+
+## 1. Decisiones que bloquean el arranque (D-12 … D-18)
+
+Las decisiones D-1 … D-11 ya están cerradas en los planes de los incrementos 1 y 2. Estas siete son nuevas y **ninguna tarea de código debe empezar antes de cerrar las que la bloquean**. Cada una lleva: qué hay que decidir, qué dicen los documentos, las opciones y una recomendación. La recomendación es una propuesta: decide el equipo.
+
+### D-12 · Origen, fase y tamaño del conjunto de entrenamiento — **bloquea T-16a**
+
+**Lo que ya está decidido en los documentos.** Las fuentes son SDBS (AIST) y NIST WebBook (MOD-06 §7). El etiquetado es multi-etiqueta, derivado de la estructura (SMILES) a un vector binario de 7 posiciones. El split es 70 / 15 / 15 sin que un compuesto caiga en dos conjuntos. El riesgo abierto n.º 4 de Requerimientos V3.2 §13 obliga a revisar los términos de uso **antes** de emplear los espectros para ajuste o redistribución, y a reservar un subconjunto independiente para RNF-08.
+
+**Lo que falta decidir.** Cuántos espectros, de qué fase, por qué vía se consiguen y qué se versiona en el repositorio.
+
+**Tres restricciones reales que condicionan la respuesta:**
+
+1. **La descarga de NIST es por especie y manual.** No hay una descarga masiva: se entra a la página del compuesto y se abre «IR Spectrum». Eso ya se comprobó al cerrar T-0R en el incremento 1. SDBS, además, no publica una URL por espectro. `SUPUESTO`: que los términos de uso de SDBS y de NIST permitan usar los espectros para **entrenar** un modelo (no solo para consultarlos) está sin confirmar; es exactamente lo que pide el riesgo n.º 4 y hay que leerlo antes de bajar nada en volumen.
+2. **La fase no es un detalle.** En el incremento 1 ya se documentó que la banda ancha e intensa de O–H (GF-01) viene de los puentes de hidrógeno y **prácticamente desaparece en fase gas**. Los dos espectros de referencia que exigen CA-05.1 y CA-05.2 (acetona y ácido benzoico) se bajaron en fase condensada. Entrenar con fase gas y evaluar contra fase condensada rompe el modelo en el grupo más importante del catálogo. **El conjunto debe ser de una sola fase, y esa fase es condensada.** Si un espectro solo existe en fase gas, se etiqueta como tal y se deja fuera del entrenamiento (o se evalúa aparte), nunca mezclado en silencio.
+3. **El desbalance de clases es inevitable.** C=O y C–H alifático aparecen en casi cualquier compuesto orgánico; C≡N es raro. Con un conjunto pequeño, los grupos raros quedan con muy pocos ejemplos positivos y su F1 se vuelve inestable (un acierto o un fallo mueven la métrica entera). Esto no se arregla con más épocas: se arregla con más compuestos de esa clase, o se asume y se documenta.
+
+**Opciones:**
+
+| | Opción | Qué cuesta | Qué se obtiene |
+|---|---|---|---|
+| A | Conjunto curado a mano desde NIST WebBook | Trabajo manual, repartido entre los dos; cada archivo se verifica (fase, rango ≥ 1400–3700, ≥ 300 puntos) y se anota su origen | Datos limpios y de fase conocida, pero pocos; los grupos débiles y raros quedarán cortos |
+| B | Buscar un conjunto de espectros IR ya publicado con licencia que permita uso de aprendizaje automático | Tiempo de búsqueda y lectura de licencias, con resultado incierto | Si existe, resuelve el tamaño de golpe. `SUPUESTO`: no está confirmado que exista uno adecuado y con licencia compatible |
+| C | Aumentación de datos sobre un núcleo curado (ruido, desplazamiento y pendiente de línea base, pequeños corrimientos, escalado de intensidad) | Poco: es un paso del script de entrenamiento | Mejora la robustez frente a variación instrumental. **No crea diversidad química**: si en el conjunto hay cinco nitrilos, el modelo sigue conociendo cinco nitrilos |
+
+**Recomendación: A + C, y revisar B en paralelo sin que bloquee.** Es la única combinación que arranca esta semana sin depender de que exista algo que no hemos confirmado. Y hay que decirlo con claridad desde ahora: **con un conjunto curado a mano, los grupos débiles (GF-06 C=C y GF-07 anillo aromático) probablemente no lleguen a F1 ≥ 0.80.** Eso no es un fracaso del plan; es lo que el propio diseño de MOD-06 §8 anticipó. Lo que no se puede hacer es descubrirlo al final: por eso D-13 tiene que cerrarse ahora, antes de entrenar.
+
+**Lo que se versiona y lo que no.** El conjunto de espectros **no entra al repositorio**: por licencia (riesgo n.º 4) y por tamaño. Lo que sí entra, y hace la evaluación auditable:
+
+- `datos/dataset/indice.csv` — una fila por espectro: identificador de especie, CAS, fase, rango, nº de puntos, origen, vector de 7 etiquetas y a qué split pertenece.
+- `datos/dataset/split-prueba.txt` — la lista **congelada** de identificadores del subconjunto de prueba, con su suma de verificación.
+- El script de entrenamiento y su semilla.
+
+Así cualquiera reproduce la evaluación de RNF-08 sin que el repositorio redistribuya datos ajenos.
+
+#### Cerrado el 23/11/2026 — la fase
+
+**El conjunto es de fase condensada; la fase gas queda fuera.** Tres consecuencias que el equipo acepta al tomarla:
+
+- **Se gana coherencia.** Los cinco espectros de referencia (acetona, ácido benzoico, el tercero de T-0R, benzonitrilo y ciclohexeno) son de fase condensada, así que entrenamiento y evaluación miden el mismo régimen. Esto es lo que protege a GF-01.
+- **Se pierde volumen.** Una parte importante de los espectros IR públicos de NIST es de fase gas; descartarlos encoge el conjunto disponible, y aprieta justo donde ya duele: en las clases raras.
+- **Y aparece una limitación del sistema, no solo del dataset.** Si un usuario sube un espectro de fase gas, el motor trabaja fuera de su régimen: la banda ancha de O–H no existirá y la confianza de GF-01 saldrá baja o nula. La vía de reglas degrada mejor que el modelo, pero tampoco es inmune, porque las posiciones de banda se corren entre fases. **Esto hay que escribirlo** como limitación conocida en §5 de Requerimientos y en el manual de usuario (RNF-07); no basta con dejarlo anotado aquí.
+
+#### Sobre la opción A: sí, es archivo por archivo
+
+Confirmado. El WebBook no tiene descarga masiva: se entra a la página de la especie, se abre «IR Spectrum» y **ahí todavía hay que elegir entre varios espectros del mismo compuesto** —líquido neto, disolución en CCl₄/CS₂, gas, distintas resoluciones— antes de bajar el JCAMP-DX. Más la verificación de rango y de nº de puntos, más la nota de origen. No son segundos por compuesto: son minutos, **con una decisión química en medio**. Por eso el coste de A crece de forma lineal y es el argumento real a favor de B.
+
+#### Sobre la opción C: qué es la aumentación, en concreto
+
+Aumentar es **fabricar variantes creíbles de un espectro que ya tienes, sin cambiar su etiqueta** —la química no cambió—: añadirle algo de ruido, inclinar o desplazar la línea base, correr el espectro uno o dos cm⁻¹, escalar la intensidad. De un espectro real salen, por ejemplo, diez entradas de entrenamiento.
+
+- **Para qué sirve.** Con pocos ejemplos, la red memoriza la curva exacta de esos espectros. Con variantes aprende el *rasgo* —«un pico agudo entre 2210 y 2260»— en vez de «esta curva concreta». Es robustez frente a la variación entre equipos, que es justo lo que RF-03 dice que el sistema debe tolerar.
+- **Para qué NO sirve, y es lo importante.** Multiplica copias, no química. Si en el conjunto hay cinco nitrilos, tendrás cinco nitrilos con ruido: el modelo sigue conociendo cinco moléculas. La aumentación arregla fragilidad, no falta de diversidad. Por eso **no sustituye a B**.
+- **La regla que la hace honesta.** Se aplica **solo al split de entrenamiento**, nunca a validación ni a prueba. Si una variante de un espectro de prueba se cuela en entrenamiento, el F1 que reporten será mentira y **nadie podrá notarlo desde fuera**.
+
+#### Sobre la opción B
+
+Es la mejor salida **si** existe un conjunto con licencia compatible, porque resuelve de golpe el problema real, que es el tamaño. Pero sigue sin confirmarse que exista: no es una decisión, es una averiguación. Propuesta: **buscarlo con tiempo acotado y en paralelo, sin que bloquee**. T-14 y T-15 no necesitan dataset y pueden arrancar hoy. Si la búsqueda no da nada utilizable, se cae a A + C sin haber perdido tiempo de la ruta crítica.
+
+#### Cerrado el 23/11/2026 — el origen: A + B, con C como técnica de entrenamiento
+
+- **A** — núcleo curado a mano desde NIST WebBook (lista de abajo).
+- **B** — búsqueda de un conjunto publicado con licencia compatible, **a cargo del compañero**, en paralelo y sin bloquear a T-14 ni T-15.
+- **C** — aumentación, aplicada **solo al split de entrenamiento**.
+
+#### Para qué se usa el núcleo curado (y para qué no)
+
+Conviene decirlo antes de que nadie baje un archivo, porque cambia la estrategia entera: **un conjunto curado a mano de ~20 compuestos no sirve para entrenar un CNN, ni aumentado.** La aumentación multiplicaría veinte moléculas, no crearía la vigésimo primera. Pero **sí es exactamente lo que hace falta** para lo otro:
+
+- el **subconjunto de prueba independiente de RNF-08**, que tiene que ser limpio, de fase conocida y verificado a mano — un conjunto masivo bajado en bloque nunca tendrá esa calidad;
+- las **fixtures de la vía de reglas** (T-15), que necesitan cubrir los 7 grupos;
+- el **split de validación** con el que se recalibran los pesos (D-15).
+
+Por eso: **el núcleo curado se reserva para prueba y validación; el grueso del entrenamiento depende de B.** Si B no aparece, se entrena con lo que haya y lo más probable es que se active el plan B de D-16 — pero el núcleo curado habrá hecho su trabajo igual, porque la vía de reglas se apoya en él.
+
+> **Regla anti-contaminación para cuando llegue B:** antes de entrenar, **quitar del conjunto de entrenamiento todo compuesto que esté en `split-prueba.txt`**, comparando por InChIKey o CAS, **nunca por nombre** (el mismo compuesto aparece como «styrene», «vinylbenzene» y «ethenylbenzene»). Si un compuesto del dataset grande coincide con uno del núcleo curado, manda el núcleo: se queda en prueba y sale de entrenamiento.
+
+#### Qué más descargar (A) — la lista
+
+Lo que falta no son *más copias*, sino **más moléculas distintas por grupo**, y sobre todo moléculas que **rompan correlaciones falsas**. Si todos sus nitrilos son aromáticos, el motor aprenderá que un nitrilo implica un anillo. Cada fila de abajo está elegida por lo que aporta, no por rellenar.
+
+**Cobertura actual, confirmada el 23/11/2026** (el tercer archivo de T-0R resultó ser `62-53-3` = **anilina**, así que GF-02 ya estaba cubierto):
+
+| Grupo | Lo cubren hoy | Estado |
+|---|---|---|
+| GF-01 O–H | ácido benzoico | Solo el **O–H de ácido** (2500–3300). **Falta el O–H de alcohol/fenol** (3200–3550), que es el caso del catálogo |
+| GF-02 N–H | anilina | Solo amina **aromática** |
+| GF-03 C–H alif. | acetona, ciclohexeno | Siempre acompañado de otro grupo; **no hay ningún negativo limpio** |
+| GF-04 C≡N | benzonitrilo | Solo nitrilo **aromático** |
+| GF-05 C=O | acetona (cetona), ácido benzoico (ácido) | Faltan **éster** y **aldehído** |
+| GF-06 C=C | ciclohexeno | Uno solo |
+| GF-07 aromático | ácido benzoico, anilina, benzonitrilo | Tres, pero **ninguno es un aromático limpio** |
+
+Los siete grupos tienen al menos un espectro, así que **la vía de reglas (T-15) ya no está bloqueada**. Lo que falta son las moléculas que rompen correlaciones falsas y llenan los huecos de la columna «Estado»:
+
+| Prioridad | Buscar | Grupos que aporta | Por qué ese |
+|---|---|---|---|
+| **1** | `acetonitrile` | GF-04 + GF-03 | **Rompe** la correlación nitrilo ↔ aromático que crearía el benzonitrilo solo |
+| **1** | `toluene` | GF-07 + GF-03 | Aromático limpio, sin O–H, sin C=O. El aromático «de libro» |
+| **1** | `1-hexene` | GF-06 + GF-03 | Alqueno terminal: segundo C=C, con =C–H claro |
+| **1** | `phenol` | GF-01 + GF-07 | O–H **sin** C–H alifático: rompe la correlación O–H ↔ alifático |
+| **1** | `ethyl acetate` | GF-05 (éster) + GF-03 | C=O de éster ~1740: si todos sus C=O son cetonas, el motor no verá un éster |
+| **1** | `hexane` o `cyclohexane` | GF-03 solo | **Negativo limpio de todo lo demás.** Sin negativos, el motor no aprende a decir que no |
+| 2 | `acetic acid` | GF-01 (ácido) + GF-05 | O–H ancho de ácido sin anillo: rompe la correlación ácido ↔ aromático del ácido benzoico |
+| 2 | `benzaldehyde` | GF-05 (aldehído) + GF-07 | Tercer subtipo de C=O |
+| 2 | `butylamine` o `propylamine` | GF-02 + GF-03 | N–H alifática, sin anillo |
+| 2 | `2-butanone` o `cyclohexanone` | GF-05 (cetona) | Cetona distinta de la acetona |
+| 2 | `acetamide` o `N-methylacetamide` | GF-02 + GF-05 (amida) | El C=O de amida baja a 1630–1700, el extremo del rango |
+| 3 | `propanenitrile` | GF-04 | Tercer nitrilo: GF-04 es el que menos ejemplos tendrá |
+| 3 | `1-butanol` | GF-01 + GF-03 | Alcohol alifático (el etanol se descartó en T-0R por no tener opción condensada limpia) |
+| 3 | `chlorobenzene` u `o-xylene` | GF-07 | Cuarto aromático |
+| 3 | `1-octene` | GF-06 | Cuarto alqueno: GF-06 es el otro grupo escaso |
+
+**Si el tiempo aprieta, bajen solo la prioridad 1**: son **seis** archivos (la anilina ya la tienen) y con ellos cada grupo queda cubierto por al menos dos moléculas distintas, y las cuatro correlaciones falsas peligrosas quedan rotas.
+
+#### Enlaces directos a la página de IR, en orden de descarga
+
+El patrón de URL de la página de espectro IR del WebBook es `cgi/inchi?ID=<ID>&Mask=80` (verificado). En cada una: elegir la entrada, abrirla y usar **«Download spectrum in JCAMP-DX format»**.
+
+| # | Compuesto | ID | Enlace |
+|---|---|---|---|
+| 1 | Tolueno | `C108883` | https://webbook.nist.gov/cgi/inchi?ID=C108883&Mask=80 |
+| 2 | Ciclohexano | `C110827` | https://webbook.nist.gov/cgi/inchi?ID=C110827&Mask=80 |
+| 3 | Fenol | `C108952` | https://webbook.nist.gov/cgi/inchi?ID=C108952&Mask=80 |
+| 4 | Acetonitrilo | `C75058` | https://webbook.nist.gov/cgi/inchi?ID=C75058&Mask=80 |
+| 5 | 1-Hexeno | `C592416` | https://webbook.nist.gov/cgi/inchi?ID=C592416&Mask=80 |
+| 6 | Acetato de etilo | `C141786` | https://webbook.nist.gov/cgi/inchi?ID=C141786&Mask=80 |
+
+#### Resultado de la revisión de entradas (23/11/2026)
+
+Al abrir las páginas apareció un patrón que conviene dejar escrito: **en la colección Coblentz, la entrada de líquido neto es la minoría**; para muchos compuestos lo único condensado es una disolución en CCl₄/CS₂.
+
+| # | Compuesto | Entrada elegida | Estado |
+|---|---|---|---|
+| 1 | **Tolueno** `C108883` | `LIQUID; PERKIN-ELMER; DIGITIZED BY NIST FROM HARD COPY; 4 cm⁻¹` (Coblentz) | ✅ Neto, sin disolvente |
+| 2 | **Ciclohexano** `C110827` | `LIQUID (NEAT); DOW KBr FOREPRISM-GRATING; DIGITIZED BY COBLENTZ SOCIETY (BATCH I); 2 cm⁻¹` | ✅ Neto, 2 cm⁻¹. **Ojo: es compuesto distinto del ciclohexeno `110-83-8`** |
+| 3 | **Fenol** `C108952` | **descartado** → ciclohexanol tampoco tenía neto → **1-butanol `C71363`**: `LIQUID (NEAT); PERKIN-ELMER 521 (GRATING); 4 cm⁻¹` | ✅ Resuelto. Ver abajo |
+| 4 | **Acetonitrilo** `C75058` | `LIQUID (NEAT); BECKMAN IR-9 (GRATING); 4 cm⁻¹` (Coblentz) | ✅ Neto |
+| 5 | **1-Hexeno** `C592416` | sin entrada neta → `1-octene` como sustituto | ⚠️ Ver abajo |
+| 6 | **Acetato de etilo** `C141786` | sin entrada neta → `butyl acetate` `C123864` o `methyl acetate` | ⚠️ Ver abajo |
+
+**Fenol: se descarta, y por una razón química, no por el disolvente.** Sus únicas entradas son gas y una disolución al 10 % en CCl₄/CS₂. En disolución diluida el O–H del fenol queda en buena parte **sin asociar**, y aparece como una banda **angosta de O–H libre cerca de 3600 cm⁻¹** en lugar de la banda ancha por puentes de hidrógeno que el catálogo describe para GF-01 en 3200–3550. Es el mismo motivo por el que en T-0R se descartó el etanol. Como fixture de GF-01 **enseñaría lo contrario de lo que queremos**. Sustituto confirmado: **ciclohexanol `C108930`** (verificado: tiene IR de Coblentz), que además es alcohol **no aromático** y así rompe la correlación O–H ↔ anillo que hoy crea el ácido benzoico. Enlace: `https://webbook.nist.gov/cgi/inchi?ID=C108930&Mask=80`
+
+> **Resuelto el 23/11/2026:** el ciclohexanol **no tenía entrada neta** (funde cerca de la temperatura ambiente), así que GF-01 lo cubre **1-butanol `C71363`** con su `LIQUID (NEAT); PERKIN-ELMER 521 (GRATING); 4 cm⁻¹`. Mejor incluso: es líquido sin ambigüedad y alcohol alifático, así que aporta O–H ancho **y** C–H alifático sin anillo. Sus otras dos entradas eran disoluciones al 0.5 % y al 10 % en CCl₄/CS₂ — la del 0.5 % habría sido la peor opción posible para GF-01, porque a esa dilución el O–H queda prácticamente sin asociar y la banda ancha desaparece.
+
+**1-Hexeno y acetato de etilo: sin entrada neta.** Solo gas o disolución en CCl₄/CS₂. El riesgo concreto es el de siempre: el artefacto de CCl₄ en ~1550 cm⁻¹ cae en 1450–1600 (**GF-07**), y **ninguno de los dos tiene anillo aromático**, así que produciría un falso positivo justo del tipo que R-2 debe suprimir. Orden de acción: (1) probar el sustituto con entrada neta — `1-octene` para GF-06, `butyl acetate` o `methyl acetate` para el éster; (2) si tampoco hay, descargar la disolución, **leer su cabecera** y aceptarla solo si no declara contaminación en 1450–1600, dejándolo anotado en la nota de origen.
+
+> **Y si la disolución resulta contaminada, no se tira: se convierte en prueba.** Un espectro real de un compuesto **sin** anillo aromático que lleva un artefacto en la región aromática es el caso perfecto para verificar R-2 con datos reales en vez de sintéticos. Se guarda en `datos/referencia/` etiquetado, igual que se hizo con el estireno.
+
+**Urgencia relativa:** el que de verdad falta es el **ciclohexano** (único negativo limpio) junto con tolueno y acetonitrilo, que ya están resueltos. El alqueno y el éster son refuerzos: GF-06 ya tiene al ciclohexeno y GF-05 ya tiene cetona y ácido.
+
+#### Cómo reconocer de qué colección viene cada entrada
+
+Esto importa porque es lo que falló con el estireno. El WebBook mezcla varias colecciones de IR y **se distinguen por la línea «Data compiled by»**:
+
+- **Coblentz Society, Inc.** — las de acetona, ácido benzoico, anilina, benzonitrilo y ciclohexeno. Fase condensada o disolución, en transmitancia. Son las que mejor encajan con §6.1.
+- **NIST Mass Spectrometry Data Center (William E. Wallace)** — las de fase gas. Fuera por la decisión de fase.
+- **IARPA / PNNL Liquid Phase IR Spectra** (Myers, Tonkyn, Oeck, Danby, Loring, Taubman, Sharpe, Birnbaum, Johnson) — líquidos de altísima resolución. **De aquí salió el estireno con `dispersion index`.** No se descartan de entrada: esta colección publica varias magnitudes derivadas y algunas sí son absorbancia. **Simplemente hay que abrir el `.jdx` y mirar `##YUNITS=` antes de aceptarlo.**
+
+**Regla, para los seis y para cualquiera que venga después:** entrada de líquido neto · sin CCl₄/CS₂ · sin gas · **`##YUNITS=` en transmitancia o absorbancia** · rango que cubra 1400–3700 · ≥ 300 puntos · nota de origen.
+
+**Mismo criterio de elección en todos:** entrada de **líquido neto** (`LIQUID (NEAT)` o equivalente), **nunca** una disolución en CCl₄/CS₂, **nunca** gas. Si un compuesto no ofrece líquido neto, se cambia por otro de la misma fila en vez de bajar una disolución. Y cada archivo con su nota de origen: ID, fase, rango, puntos, grupos que cubre, fecha.
+
+---
+
+### D-13 · Qué significa exactamente «alcanzar RNF-08» — **bloquea el criterio de terminado de T-16**
+
+Esta es la decisión más importante del incremento, y existe porque **dos documentos aprobados dicen cosas distintas**:
+
+- **Requerimientos V3.2, RNF-08:** «el motor debe alcanzar una puntuación F1 promedio ≥ 0.80 **en los siete grupos** (meta inicial, **a confirmar en la fase de diseño**)».
+- **Diseño de MOD-06 v2, §8:** «Meta: F1 ≥ 0.80 **en los grupos bien marcados** (C=O, O–H, C≡N). Los débiles (C=C, anillo aromático) serán más bajos — **documentarlo, no ocultarlo**».
+
+No es una contradicción de fondo: RNF-08 delega su confirmación a la fase de diseño, y la fase de diseño la refinó. El Plan V3 ya está alineado con el diseño (el «Terminado» de T-16 dice «meta F1 ≥ 0.80 en los grupos bien marcados»). **Lo único que falta es cerrarlo por escrito**, para que «terminado» signifique lo mismo para quien entrena y para quien revisa.
+
+**Propuesta de cierre — el criterio de aceptación de T-16 es el conjunto de estos cuatro puntos:**
+
+1. **Puerta (lo que decide pasa/no pasa):** F1 ≥ 0.80 **por grupo** en GF-01 (O–H), GF-04 (C≡N) y GF-05 (C=O), medido sobre el subconjunto de prueba independiente.
+2. **Informativo (se reporta siempre, nunca se oculta):** precisión, recall, F1 y nº de positivos (*support*) de **los siete** grupos, más el macro-F1 global y la matriz de confusión uno-contra-resto. Si el macro-F1 de los siete queda por debajo de 0.80, se escribe el número y se explica por qué, con el support de cada clase a la vista.
+3. **Dos evaluaciones, no una.** MOD-06 §8 y el Plan V3 piden cosas distintas en sitios distintos, y ambas se hacen: (a) **la vía ML sola**, binarizando su sigmoide en 0.5, que es lo que mide si el modelo aprendió; (b) **el motor completo**, post-fusión y con el umbral de 60 %, que es lo que el usuario recibe. Las dos tablas van en la evidencia.
+4. **Si falla un grupo de la puerta** (típicamente GF-04 por falta de ejemplos), no se baja la meta: se activa la ruta de D-16.
+
+**Por qué importa tanto:** sin esto, T-16 no tiene criterio de terminado y se cierra «cuando parezca suficiente». Con esto, el plan B deja de ser una excusa de última hora y se vuelve una decisión con disparador definido.
+
+#### Cerrado el 23/11/2026: se adopta la propuesta tal cual
+
+**Dónde se actualiza la decisión del F1**, en cuatro sitios y por este orden:
+
+| Documento | Sección exacta | Qué cambia |
+|---|---|---|
+| **Requerimientos y Matriz V3.2** | **§8, fila RNF-08** | Es el origen de la ambigüedad. Hoy dice «F1 promedio ≥ 0.80 en los siete grupos (meta inicial, **a confirmar en la fase de diseño**)». Esa cláusula ya se cumplió: se reescribe con la **puerta** (F1 ≥ 0.80 por grupo en GF-01, GF-04 y GF-05) y la obligación de **reportar los siete** con su support |
+| **Requerimientos y Matriz V3.2** | **§11.2, fila RNF-08** | Hoy dice «F1 por grupo y promedio ≥ 0.80». Se alinea palabra por palabra con el texto nuevo de §8 |
+| **Requerimientos y Matriz V3.2** | **Control de versiones** (p. 3) | Fila nueva **V3.3** con la descripción del cambio y su fecha. Aprovechar la misma versión para el pendiente del `.dx` en RF-01 |
+| **Diseño detallado de MOD-06 v2** | **§8, «Evaluación y pruebas»** | Ya dice lo correcto en espíritu; se le añade la redacción literal de la puerta para que ambos documentos digan lo mismo. Versión v2.1 |
+
+El **Plan de Implementación V3 no necesita cambio**: el «Terminado» de T-16 (Paso 4) y la fila de riesgo del Paso 8 ya están alineados con esta lectura.
+
+Y una regla de higiene, la misma que usaron con los 5 MB para evitar la deriva: **el criterio operativo vive aquí (D-13); Requerimientos solo enuncia la regla.** Nadie copia el número a un tercer sitio.
+
+---
+
+### D-14 · Los dos espectros que faltan: GF-04 (C≡N) y GF-06 (C=C) — **bloquea T-3R y los CA de regla**
+
+De los tres espectros reales que se bajaron en T-0R (acetona, ácido benzoico y un tercero), **ningún compuesto cubre C≡N ni C=C**. Quedó anotado en el incremento 1 como herencia explícita para el incremento 3. Sin ellos, la vía de reglas no se puede probar en dos de los siete grupos y el dataset arranca con dos clases vacías.
+
+**Propuesta, con los identificadores verificados en el WebBook:**
+
+| Grupo | Compuesto | CAS | ID de especie NIST | Por qué este |
+|---|---|---|---|---|
+| **GF-04 (C≡N)** | Benzonitrilo | 100-47-0 | `C100470` | Verificado: su página lista «IR Spectrum». Ventaja doble — además del C≡N trae **anillo aromático y C–H aromático**, así que sirve también como caso multi-etiqueta (GF-04 + GF-07) |
+| **GF-06 (C=C)** | Ciclohexeno | 110-83-8 | `C110838` | Verificado: su página lista «IR Spectrum». Ventaja clave — **no tiene anillo aromático**, así que aísla GF-06 de GF-07 y permite probar la regla de desempate desde el lado limpio |
+| **Caso difícil (GF-06 + GF-07)** | Estireno | 100-42-5 | `C100425` | Verificado: su página lista «IR Spectrum». Vinilo C=C ~1630 **y** anillo aromático 1600/1500, con =C–H y C–H aromático ambos por encima de 3000. Si la regla R-2 sobrevive al estireno, sobrevive a cualquier cosa |
+
+**Advertencia honesta sobre el ciclohexeno:** su C=C es una banda **débil** y su =C–H cerca de 3020 cm⁻¹ también. No es un espectro fácil — es un espectro *representativo*. Si la vía de reglas detecta GF-06 aquí, detecta GF-06 de verdad; si se eligiera un alqueno con una señal artificialmente clara, la prueba pasaría sin decir nada útil.
+
+**Disciplina que se hereda de T-0R y se mantiene:** `SUPUESTO` — la página de especie de NIST **no declara la fase** del espectro IR; hay que verla al abrir el espectro. Cada archivo nuevo se guarda con su nota de origen: ID de especie, CAS, **fase**, rango cubierto, nº de puntos, qué CA o qué grupo cubre y fecha de descarga. Y se revisan los términos de uso antes de versionarlo (las páginas de NIST llevan la nota de *data compilation copyright* del U.S. Secretary of Commerce).
+
+#### Cerrado el 23/11/2026: cuál descargar de cada uno
+
+Cada compuesto ofrece **varios** espectros IR, y la elección no es indiferente. Estos son los tres:
+
+| Grupo | Compuesto | Entrada exacta a descargar | Por qué esa y no las otras |
+|---|---|---|---|
+| **GF-04** | Benzonitrilo `C100470` | **LIQUID; PERKIN-ELMER; DIGITIZED BY NIST FROM HARD COPY; 4 cm⁻¹** | Es el único de fase condensada **sin disolvente**. Las otras tres son disoluciones «versus solvent» en CCl₄ y CS₂ — exactamente la familia de archivo que dejó la contaminación de CCl₄ en ~1550 cm⁻¹ en la acetona (R-3). Bajar una de esas sería meter un falso GF-07 **en un compuesto que sí tiene anillo aromático**, y entonces ya no se podría distinguir señal de artefacto. El `gas; HP-GC/MS/IRD` queda fuera por la decisión de fase |
+| **GF-06** | Ciclohexeno `C110838` | **LIQUID (NEAT) $$ 99.9% PURE; BECKMAN IR-12 (GRATING); 2 cm⁻¹** | Neto, fase condensada y **con pureza declarada**, que aquí importa de verdad: el ciclohexeno comercial suele venderse estabilizado con un inhibidor fenólico, y un fenol mete un O–H que daría un **GF-01 falso en un hidrocarburo**. El 99.9 % minimiza ese riesgo. Segunda opción: el `LIQUID (NEAT)` sin nota de pureza. Fuera: los dos de gas y el `LIQUID (60 mmHg diluido … con nitrógeno)`, cuya descripción es de condiciones de gas |
+| **GF-06 + GF-07** | **descartado el estireno** — ver abajo | — | El caso «ambos a la vez» baja a prioridad 2 y se cubre de otra forma |
+
+#### El estireno quedó descartado como referencia (23/11/2026)
+
+Se descargó y su cabecera trae **`##YUNITS=dispersion index`**. Eso **no sirve**: §6.1 admite únicamente transmitancia o absorbancia, y esta magnitud pertenece a la familia de las constantes ópticas (índice de refracción / dispersión), no a una medida de absorción. Las otras entradas del estireno tampoco valen: dos son de gas y dos son disoluciones en CCl₄/CS₂, con el artefacto justo entre las bandas aromáticas de 1600 y 1500.
+
+**Y el archivo es más útil de lo que parece: se guarda como caso de error real.** Hoy MOD-03 valida estructura, puntos y rango, pero **no la unidad**, así que este archivo **pasaría la validación**, llegaría a MOD-04 y el motor analizaría números que no son intensidades — con gráfica y detecciones sin ningún significado químico. Es el ejemplo concreto que le faltaba a la decisión abierta sobre `##YUNITS=` (sección 12), y se versiona en `datos/referencia/` marcado como caso de error, igual que se hizo en el incremento 1 con los otros dos de unidad rara.
+
+**Cómo se cubre entonces el desempate C=C / aromático (R-2), que era el objetivo:**
+
+1. **Con un par de espectros, no con un compuesto** — y de hecho es la prueba más fuerte, porque discrimina en las dos direcciones:
+   - **ciclohexeno** → GF-06 **sí**, GF-07 **no**
+   - **tolueno** → GF-07 **sí**, GF-06 **no**
+
+   Los dos están ya en la lista de descargas, así que esto no cuesta nada extra y cierra R-2.
+2. **El caso «ambos a la vez»** —que solo prueba que se puedan reportar juntos, una propiedad más suave— pasa a **prioridad 2**. Candidatos a revisar en el WebBook, buscando entrada de líquido neto y unidad admitida: `indene`, `allylbenzene`, `alpha-methylstyrene`. Si ninguno tiene una entrada utilizable, se deja documentado y se vive con ello: el par del punto 1 ya protege la regla.
+
+**Al descargar cada uno, verificar antes de guardarlo** (la misma lista de T-0R): que cubra **1400–3700 cm⁻¹**, que tenga **≥ 300 puntos**, y anotar fase, rango, nº de puntos, ID de especie, qué grupo cubre y la fecha. Si un archivo no cumple rango o puntos, se elige otra entrada del mismo compuesto antes de cambiar de compuesto.
+
+---
+
+### D-15 · Umbral, pesos y la aritmética del 60 % en UT-03 — **bloquea T-17**
+
+**Lo decidido en los documentos:** umbral 60 % (0.6), configurable en UT-03 (Requerimientos §6.1, MOD-06 §6). Pesos `conf = wR·score_regla + wML·prob_ml`, con `wR + wML = 1`, arrancando en 0.5 / 0.5 y ajustando con validación.
+
+**Lo que falta cerrar, en cuatro puntos:**
+
+**1. Las claves en `parametros.json` y su invariante.** Propuesta: `umbral_confianza: 0.6` y `pesos: { wR: 0.5, wML: 0.5 }`. UT-03 ya valida la configuración al cargar (criterio de terminado de T-01); se le añade la verificación de que `wR + wML = 1` y de que ambos están en [0, 1]. Si no cuadra, el backend no arranca en silencio: error de configuración claro, igual que en el incremento 1.
+
+**2. La recalibración usa el split de validación, nunca el de prueba.** Esto es lo que hace honesto a RNF-08. El subconjunto de prueba se toca **una sola vez**, al final, para reportar. Si se ajustan los pesos mirando la prueba, el número que se entrega deja de significar nada y nadie fuera del equipo podrá notarlo. Regla dura, sin excepciones.
+
+**3. La banda «posible» (0.4–0.6) queda FUERA del incremento 3.** MOD-06 §6 la marca como opcional; ningún CA la cubre; y mostrarla cambiaría lo que MOD-01 pinta y lo que el reporte del incremento 5 tendría que explicar. Propuesta: no implementarla. Si el equipo la quiere, es una decisión de alcance con su propio CA, no un añadido silencioso.
+
+**4. La trampa aritmética del 60 % — y es una trampa real.** CA-05.3 exige que **exactamente 60 % aparezca** y **59 % no**; CA-08.2 exige que un máximo de 59 % dispare el aviso. Pero `conf` es un número de punto flotante y la interfaz muestra un porcentaje redondeado. Si se compara el flotante crudo contra 0.6 y se redondea aparte para mostrar, un 0.599 se muestra como «60 %» y **no** aparece detectado: la pantalla contradice al veredicto, y el usuario ve un 60 % que el sistema dice que no alcanza el 60 %.
+
+> **Propuesta:** calcular primero el porcentaje entero (redondeo al más cercano) y **comparar ese entero contra 60**. Veredicto y pantalla salen del mismo número, así que no pueden contradecirse, y CA-05.3 / CA-08.2 se cumplen literalmente.
+>
+> **El precio, dicho de frente:** un `conf` de 0.5951 se convierte en 60 % y se reporta como detectado, aunque crudo no llegue a 0.6. Es medio punto porcentual de holgura a cambio de que nunca haya una pantalla que se contradiga. La alternativa —comparar el flotante y truncar hacia abajo para mostrar— elimina la holgura pero obliga a definir el redondeo con el mismo cuidado. Cualquiera de las dos sirve **si queda escrita**; lo que no sirve es dejarlo al criterio de quien implemente.
+
+**Cerrado el 23/11/2026:** se adoptan los cuatro puntos. El umbral se compara sobre el **porcentaje entero redondeado**, con la holgura de medio punto aceptada a cambio de que pantalla y veredicto no puedan contradecirse.
+
+---
+
+### D-16 · El plan B (`wML = 0`): disparador y forma del contrato — **bloquea T-17 y T-19**
+
+**Lo decidido:** si el CNN no alcanza las métricas a tiempo, se entrega con `wML = 0` (solo reglas) sin cambiar el contrato ni el resto de la app (MOD-06 §10, Plan V3 Paso 8). La vía de reglas ya identifica de punta a punta por sí sola — es la Fase 1 del diseño.
+
+> **La decisión es una sola: ¿cuándo nos rendimos con el modelo y entregamos solo con reglas, y quién lo dice?** Eso es el punto 1. Los puntos 2, 3 y 4 **no son decisiones del equipo**: son instrucciones para el agente de código, para que ese cambio no rompa nada el día que ocurra. Basta con aprobarlos.
+
+**Lo que falta cerrar:**
+
+**1. El disparador — ESTA es la decisión.** Propuesta: se evalúa **al cerrar H9**, y se activa el plan B si ocurre cualquiera de estas tres cosas:
+- la vía ML no cumple la puerta de D-13;
+- el conjunto de datos (T-16a) no está cerrado cuando T-15 termina;
+- la inferencia del modelo no cabe en el presupuesto de RNF-02 (≤ 5 s por análisis, CPU).
+
+`SUPUESTO`: la fecha límite de calendario. Los documentos no fijan fechas y este plan no las inventa. El disparador está amarrado a un **hito**, no a un día; el equipo le pone la fecha al asignar responsables.
+
+**2. Quién decide.** El equipo, por escrito en este documento y en la bitácora de IA. No lo decide quien está entrenando, y no se decide a mitad de una tarea.
+
+**3. La forma del contrato — aquí está el detalle que ahorra una ruptura más adelante.** Con `wML = 0`, `conf = score_regla` y la vía ML no produce nada. Pero el JSON de MOD-06 §5 publica `"evidencia": { "regla": 0.97, "ml": 0.91 }`, y MOD-07 (incremento 4) y MOD-08 (incremento 5) lo van a leer.
+
+> **Propuesta:** `evidencia.ml` **se mantiene como clave** y vale `null` cuando no hay vía ML. Y se añade un campo `"modo": "hibrido" | "reglas"` al resultado.
+>
+> Dos razones. Una: quitar la clave rompería a los consumidores, mientras que agregar un campo opcional no rompe a nadie. Dos: **MOD-07 y MOD-08 deben tratar `ml` como anulable desde el primer día**, aunque hoy el modo híbrido funcione. Hacerlo ahora cuesta cero; descubrirlo en el incremento 5, cuando el PDF reviente al generarse en modo reglas, cuesta una tarde.
+>
+> Y hay una consecuencia honesta: si el motor corrió en modo reglas, el reporte del incremento 5 debería decirlo, junto al aviso de resultado orientativo que ya exige RF-08. Queda anotado como herencia, no se implementa aquí.
+
+**4. El modelo ausente en tiempo de ejecución.** Si el archivo de pesos no está, la app **arranca en modo reglas** y lo registra; no revienta ni se queda esperando. Esto es distinto de CA-05.4 (fallo interno del motor): ahí sí hay mensaje de error al usuario. Falta de modelo = degradación anunciada; fallo del motor = error. Dos códigos distintos en UT-02.
+
+**Cerrado el 23/11/2026:** se adoptan los cuatro puntos. El plan B se evalúa **al cerrar H9** y se activa si falla la puerta de D-13, si el conjunto de datos no está listo cuando T-15 termina, o si la inferencia no cabe en los 5 s de RNF-02. **Lo decide el equipo junto y por escrito** — no quien esté entrenando, y no a mitad de una tarea.
+
+---
+
+### D-17 · El contrato HTTP de «Analizar» — **bloquea T-18**
+
+`SUPUESTO`, y lo primero que hay que resolver **leyendo el código del incremento 2**, no de memoria: no está confirmado en los documentos qué endpoints existen hoy. El incremento 1 montó `POST /api/validar` (contrato D-5). Si el incremento 2 añadió algo para entregar el espectro procesado al navegador, este contrato se acopla a eso.
+
+El problema de fondo: la app es **sin estado** y no persiste nada (RNF-09). Cuando el usuario pulsa «Analizar» (paso 2 de los tres de RNF-01), el servidor ya no tiene el espectro. Hay dos salidas:
+
+| | Opción | A favor | En contra |
+|---|---|---|---|
+| 1 | `POST /api/analizar` recibe **el vector normalizado y el eje** (JSON) y devuelve la salida de MOD-06 §5 | Sin estado y barato (el navegador ya tiene el vector: MOD-05 lo está graficando). Y encaja exactamente con el aislamiento del diseño: «MOD-06 solo recibe números, **nunca el archivo**» | El cliente podría mandar un vector arbitrario → hay que validar lo que llega |
+| 2 | Se reenvía el archivo y el servidor vuelve a correr MOD-03 → MOD-04 → MOD-06 | Un solo contrato, ya conocido | Reparsea de gratis, mete el archivo otra vez en la ruta de análisis y gasta presupuesto de RNF-02 |
+
+**Recomendación: opción 1**, porque es la que el propio diseño describe. Con una condición no negociable: **el endpoint valida lo que llega** antes de pasárselo al motor —longitud igual a la rejilla fija, valores dentro de [0, 1], eje monótono de 4000 a 400— y rechaza con su código de UT-02. No hay cuentas ni datos de terceros en juego, pero un vector mal formado no debe llegar al modelo.
+
+#### Cerrado el 23/11/2026: opción 1, y con dato nuevo del incremento 2
+
+Ya existe **`POST /api/procesar`**, añadida para entregarle el espectro a la gráfica en lugar de cambiar la respuesta de `/api/validar`, que el incremento 1 dejó cerrada (quedó anotada al final de `docs/plan/incremento-2.md`, junto con los supuestos). **Esa decisión es correcta y queda confirmada por el equipo:** no tocar un contrato cerrado y añadir una ruta nueva es exactamente la disciplina de fronteras del proyecto.
+
+El incremento 3 **añade `POST /api/analizar`** junto a las otras dos; no modifica ninguna. El navegador ya tiene el vector normalizado —viene de `/api/procesar` y lo está graficando MOD-05—, así que lo reenvía tal cual. Las tres rutas quedan alineadas con los tres pasos de RNF-01:
+
+```
+/api/validar (inc. 1)  →  /api/procesar (inc. 2)  →  /api/analizar (inc. 3)
+   cargar                      ver la gráfica            analizar
+```
+
+Sigue en pie la condición: `/api/analizar` **valida lo que llega** (longitud igual a la rejilla fija, valores en [0, 1], eje monótono de 4000 a 400) y rechaza con su código de UT-02 antes de tocar el motor.
+
+**El contrato de `/api/procesar`, confirmado por el incremento 2** (§11 de `incremento-2.md`). Recibe `multipart/form-data` con el archivo en el campo `archivo` y responde 200 con:
+
+```
+{ "valido": true, "nombre": "...",
+  "espectro": { "eje_cm1": [...], "intensidad": [...],
+                "rango_medido_cm1": [min, max], "unidad_original": "..." } }
+```
+
+**`/api/analizar` recibe en JSON exactamente ese objeto `espectro`** — tal como lo propuso quien implementó el incremento 2. No se inventa un formato nuevo y el navegador reenvía lo que ya tiene.
+
+**Códigos de error: se reutilizan los que ya existen, no se duplican.** MOD-04 ya definió `DATOS_ILEGIBLES`, `UNIDAD_NO_SOPORTADA`, `UNIDAD_SIN_DECLARAR` y `SIN_SENAL`, y un fallo interno responde **500 con `FALLO_INTERNO`**. **CA-05.4 (fallo del motor) usa `FALLO_INTERNO`**, que ya está hecho y probado; MOD-06 solo añade lo suyo (vector inválido, y el registro interno de modelo ausente).
+
+El tamaño N se cierra en **D-19**.
+
+---
+
+### D-18 · Dónde vive el modelo entrenado y si se versiona — **bloquea T-16c**
+
+> **La decisión es una sola: el archivo del modelo entrenado, ¿lo subimos a GitHub o no?** Es una pregunta y no un trámite porque es un **binario que cambia entero en cada reentrenamiento**, y Git guarda todas las versiones para siempre: a los veinte entrenamientos el repositorio pesa veinte modelos aunque solo se use el último, y eso lo arrastra cualquiera que clone. Lo demás de esta sección no es decisión: es una aclaración para el agente de código.
+
+La decisión de persistencia v2 ya dice qué es: un **archivo de pesos de solo lectura** en `motor-identificacion/modelo/`, leído a través de UT-01, igual que el catálogo. Lo que falta es si entra a Git.
+
+- **Durante la iteración:** fuera de Git (`.gitignore`). Un binario que cambia en cada entrenamiento infla el historial sin aportar nada.
+- **Para la entrega:** se versiona **un** archivo de pesos final, junto con el script de entrenamiento, la semilla y `split-prueba.txt`. Así la evaluación de RNF-08 es reproducible sin redistribuir el dataset.
+- Si el archivo final resulta demasiado grande para el repositorio, la alternativa es Git LFS; decidirlo cuando se sepa el tamaño real, no antes.
+
+**Un detalle de aislamiento que conviene dejar escrito**, porque el diseño parece contradecirse y no lo hace: MOD-06 §9 dice «sin acceso a red ni a archivos», y también «el modelo se carga una vez en memoria». Se resuelve así: **la carga ocurre al arrancar, a través de UT-01**, que es el único módulo que toca el sistema de archivos (persistencia v2). En tiempo de inferencia MOD-06 no toca disco ni red. Sin esta frase, el agente de código acabará poniendo rutas de archivo dentro de MOD-06.
+
+**Cerrado el 23/11/2026:** el modelo **no va a Git mientras se itera** (entra en `.gitignore`); para la entrega se versiona **un** archivo de pesos final, junto con el script de entrenamiento, la semilla y `split-prueba.txt`, de modo que la evaluación de RNF-08 sea reproducible. Si ese archivo final resulta demasiado grande para el repositorio, se valora Git LFS **entonces**, con el tamaño real a la vista.
+
+---
+
+### D-19 · N = 1024: dejar de llamarlo SUPUESTO y blindarlo — **bloquea T-16c**
+
+El incremento 2 confirmó dónde vive y cuánto vale: **`puntos_rejilla = 1024`** y **`rango_rejilla_cm1 = [400, 4000]`**, en UT-03 (`backend/utilerias/configuracion/parametros.json`, bloque `procesamiento`), leídos por MOD-04. Quedó marcado `SUPUESTO` porque el 1024 salió del «p. ej.» del diseño de MOD-06 §5.
+
+**El problema no es que fuera un supuesto; es que siga siéndolo.** N no es un dato del mundo que se pueda verificar contra una fuente externa — es una **elección de diseño**. Un supuesto abierto invita a «mejorarlo» más adelante, y cambiarlo después de entrenar **invalida los pesos en silencio**: el modelo seguiría cargando y devolviendo números, solo que equivocados. Así que se cierra como decisión, con su justificación:
+
+- **3600 cm⁻¹ de recorrido (4000–400) entre 1024 puntos ≈ 3.5 cm⁻¹ por punto.** Los espectros reales del proyecto están a 2 y 4 cm⁻¹ de resolución, así que 1024 ni tira resolución que existe ni inventa detalle que no hay. Es el número correcto por una razón, no por inercia.
+- **Potencia de dos**, cómoda para las reducciones sucesivas de un CNN 1D (1024 → 512 → 256 …) sin restos.
+
+**Las tres reglas que lo blindan:**
+
+1. **Congelado desde que arranca T-16c.** Antes de entrenar se puede cambiar; después, cambiarlo **obliga a reentrenar**, y eso es una decisión del equipo, no un ajuste de configuración.
+2. **El archivo de pesos registra la N con la que se entrenó.**
+3. **MOD-06 compara al arrancar** la N de los pesos contra `procesamiento.puntos_rejilla` de UT-03. Si no coinciden, **no carga el modelo**: lo registra y degrada a modo reglas (D-16.4). Un fallo ruidoso en el arranque en lugar de resultados equivocados en producción — es la contramedida concreta al riesgo «consistencia MOD-04 ↔ MOD-06» de MOD-06 §11.
+
+**Cerrado el 23/11/2026:** N = 1024, congelada desde T-16c, con la comprobación de arranque. **Deja de estar marcada `SUPUESTO`** en UT-03 y en `incremento-2.md` §11: pasa a ser una decisión con justificación escrita.
+
+---
+
+## 2. Alcance y fronteras del incremento 3
+
+**Dentro:**
+
+- UT-01, el catálogo de los 7 grupos, como fuente única (T-14).
+- MOD-06 completo: vía de reglas (T-15), vía ML (T-16), fusión y umbral (T-17).
+- MOD-01 ampliado: la lista ordenada con su confianza (T-18) y el aviso de «sin detecciones confiables» o de fallo del motor (T-19).
+- El trabajo de datos que lo habilita (T-3R).
+- CA-05.1 … CA-05.4, CA-08.1 … CA-08.3, RNF-08 y la primera medición real de RNF-02.
+
+**Fuera, explícitamente:**
+
+| Qué | Dónde va |
+|---|---|
+| Las plantillas de explicación y el texto educativo | T-20, T-21, T-22 — incremento 4. **T-20 puede adelantarse aquí**: solo depende del catálogo (T-14), y el Plan V3 ya lo autoriza |
+| Resaltar la región y el pico sobre la gráfica | T-23, T-24 — incremento 4. MOD-06 **sí entrega** `region_cm1` y `pico_cm1`; quien los pinta es MOD-05, después |
+| El reporte en PDF | T-25 … T-27 — incremento 5 |
+| Los subtipos de C=O (cetona ~1715, éster 1735–1750, amida 1630–1700 …) | Son **datos del catálogo** para las explicaciones del incremento 4. En el incremento 3 **GF-05 es una sola detección**: RF-04 pide los siete grupos, no sus subtipos |
+| La banda «posible» 0.4–0.6 | Fuera por D-15, salvo que el equipo decida lo contrario |
+| Identificar la molécula completa, cuantificar, otras técnicas | Fuera del alcance del proyecto (Requerimientos §5) |
+
+**La frontera que más hay que cuidar:** MOD-06 es **zona aislada**. Recibe el vector normalizado y el eje según el contrato de MOD-06 §5, y nada más. No ve el archivo, no ve su nombre, no ve el veredicto de MOD-03, no abre archivos en inferencia, no sale a la red. Si una tarea de este incremento necesita algo que no está en ese contrato, **la tarea está mal planteada** — hay que replantearla, no ensanchar el contrato.
+
+---
+
+## 3. Módulos, archivos y dependencias
+
+| Módulo / utilería | Archivos previstos | Necesita de | Entrega a | Tarea |
+|---|---|---|---|---|
+| **UT-01 · Catálogo** | `datos/catalogo/grupos.json` + su lector de solo lectura | — | MOD-06 (y MOD-07, MOD-08 después) | T-14 |
+| **UT-03 · Configuración** (se amplía) | `backend/utilerias/configuracion` | — | MOD-06 | T-15 / T-17 |
+| **UT-02 · Mensajes** (se amplía) | `backend/utilerias/mensajes` | — | MOD-06, MOD-01 | T-19 |
+| **MOD-06 · reglas** | `motor-identificacion/reglas` | T-10 (vector), UT-01 | fusión | T-15 |
+| **MOD-06 · modelo** | `motor-identificacion/modelo` | T-10, UT-01 (orden de etiquetas) | fusión | T-16 |
+| **MOD-06 · inferencia** | `motor-identificacion/inferencia` | reglas + modelo + UT-03 | MOD-01, y MOD-07 después | T-17 |
+| **Entrenamiento** (fuera de la app) | `herramientas/entrenamiento/` | MOD-04 (normalización), dataset | el archivo de pesos | T-16 |
+| **MOD-01 · interfaz** (se amplía) | `frontend/interfaz`, `frontend/servicios` | contrato de MOD-06 | usuario | T-18, T-19 |
+
+**Dos reglas de dirección que evitan el error que ya mordió en el incremento 1:**
+
+1. **El script de entrenamiento importa de la app; la app nunca importa del script.** `herramientas/entrenamiento/` usa la normalización **real de MOD-04**, no una copia. Si el entrenamiento normaliza distinto que producción, el modelo funciona en el cuaderno y falla en la app, y el síntoma aparece lejísimos de la causa. Es el mismo riesgo que MOD-06 §11 llama «consistencia MOD-04 ↔ MOD-06», y la misma lección de D-2.
+2. **Nadie lee `grupos.json` por su cuenta.** Todos piden los datos a UT-01 (persistencia v2). Un número de región escrito a mano en la vía de reglas es un defecto, no un atajo.
+
+---
+
+## 4. Los números del catálogo (base de UT-01 y de la vía de reglas)
+
+Tomados de Requerimientos V3.2 §6.2 y de MOD-06 §4. **Este es el único lugar del incremento donde estos números se escriben**; de aquí pasan a `grupos.json` y de ahí los lee todo lo demás.
+
+| ID | Grupo | Región principal (cm⁻¹) | Región acompañante (cm⁻¹) | Intensidad / forma |
+|---|---|---|---|---|
+| GF-01 | O–H (alcoholes, fenoles y ácidos) | 3200–3550 | ácidos: 2500–3300 | Fuerte, ancha |
+| GF-02 | N–H (aminas y amidas) | 3300–3500 | — | Media; más angosta que O–H; 2 picos (primarias), 1 (secundarias) |
+| GF-03 | C–H alifático (sp³) | 2850–2960 | — | Media; picos **agudos** justo por debajo de 3000 |
+| GF-04 | C≡N (nitrilos) | 2210–2260 | — | Media; pico agudo en zona casi siempre vacía |
+| GF-05 | C=O (carbonilo) | 1670–1780 | — | Fuerte y aguda; suele ser la señal más evidente |
+| GF-06 | C=C (alquenos) | 1620–1680 | =C–H 3020–3100 | Media / débil |
+| GF-07 | Anillo aromático | 1450–1600 (bandas ~1600 y ~1500) | C–H aromático 3000–3100 | Media; **par** de bandas |
+
+**Orden canónico de las etiquetas: GF-01, GF-02, GF-03, GF-04, GF-05, GF-06, GF-07.** Ese es el orden del vector binario de 7 posiciones del etiquetado y de la salida del CNN. Queda fijado aquí porque **T-16 y T-14 tienen que coincidir** y son tareas distintas, posiblemente de personas distintas: si el orden se decide dos veces, el modelo acierta con las etiquetas cruzadas y nadie lo nota hasta que el ácido benzoico reporte un nitrilo.
+
+**Nota documental menor** (no es una decisión): para el C–H aromático de GF-07, Requerimientos §6.2 da 3000–3100 y MOD-06 §4 menciona «~3030». Se usa el rango de Requerimientos; 3030 es la posición típica dentro de él. Los subtipos de C=O de MOD-06 §4 se cargan como `subtipos` informativos para el incremento 4.
+
+---
+
+## 5. Contratos
+
+### UT-03 → MOD-06
+El umbral y los pesos, según D-15: `umbral_confianza`, `pesos.wR`, `pesos.wML`, validados al cargar.
+
+### UT-01 → MOD-06
+Por cada grupo: `id`, `nombre`, `enlace_vibracion`, `region_cm1: [min, max]`, `regiones_acompanantes: [ { rango, rol } ]`, `intensidad`, `forma`, `pista`, `subtipos` (informativo). Más la `version` del catálogo y el orden canónico. Solo lectura.
+
+### MOD-04 → MOD-06  *(fuente única: MOD-06 §5, ya fijada en el incremento 2 por T-10)*
+- `intensidad`: **absorbancia, línea base corregida, normalizada 0–1**, en **1024 puntos** (D-19).
+- `eje_cm1`: el eje ordenado de **4000 a 400 cm⁻¹**, repartido de forma pareja.
+- `rango_medido_cm1`: `[min, max]` — el tramo que **de verdad midió el archivo**.
+- `unidad_original`: absorbancia, transmitancia o porcentaje. Informativa para MOD-06.
+- Todo redondeado a 6 decimales.
+- **Nunca el archivo, ni su nombre, ni su formato.**
+
+> #### El relleno de ceros: el detalle que más fácil rompe el modelo
+>
+> El incremento 2 lo dejó advertido y conviene subrayarlo: **fuera de `rango_medido_cm1` la intensidad vale 0, y ese 0 es relleno, no absorbancia cero.** Un espectro que solo cubre el mínimo exigido por §6.1 (1400–3700) llega con cerca del 40 % del vector relleno; uno que cubre 400–4000 llega sin nada de relleno. Son dos vectores muy distintos para la misma química.
+>
+> **Para la vía de reglas (T-15):** un cero de relleno **no es «no hay pico»**, es «no se midió». Como §6.1 garantiza 1400–3700 y **las regiones de los siete grupos caben dentro de ese intervalo** —por eso se eligió ese mínimo—, en un archivo válido ninguna región queda sin medir. Aun así, T-15 comprueba contra `rango_medido_cm1` antes de puntuar: si una región cayera fuera, el grupo se marca **no evaluable**, no «ausente». La diferencia importa en el incremento 4, cuando haya que explicarlo.
+>
+> **Para la vía ML (T-16), que es donde de verdad muerde:** si unos espectros del conjunto llevan relleno y otros no, la red puede aprender **la forma del relleno** en vez de la química — y si por azar los nitrilos del conjunto vienen de archivos de rango corto, aprenderá que «relleno ancho ⇒ nitrilo». Es un atajo invisible que infla las métricas de entrenamiento y se derrumba en producción. **Regla: el CNN recibe únicamente la ventana 1400–3700 cm⁻¹**, que §6.1 garantiza medida en todo archivo válido, de modo que el relleno nunca entra al modelo. La vía de reglas sí puede usar la rejilla completa, porque mira regiones concretas. Esto no cambia el contrato: MOD-06 recorta por dentro.
+
+### MOD-06 → MOD-01 / MOD-07  *(MOD-06 §5, con los dos añadidos de D-16)*
+
+```
+{
+  "detecciones": [
+    { "grupo": "GF-05", "confianza": 0.94,
+      "region_cm1": [1670, 1780], "pico_cm1": 1715,
+      "evidencia": { "regla": 0.97, "ml": 0.91 } }
+  ],
+  "sin_detecciones": false,
+  "umbral": 0.6,
+  "modo": "hibrido"
+}
+```
+
+- `detecciones` va **ordenada de mayor a menor confianza** (RF-04).
+- `region_cm1` y `pico_cm1` **vienen siempre de la vía de reglas**, nunca del modelo (MOD-06 §2 y §6). El modelo aporta robustez, no posición: no sabe dónde está el pico.
+- `pico_cm1` puede ser `null` — un grupo detectado sin posición exacta de pico es un caso previsto (CA-06.3, incremento 4).
+- `evidencia.ml` puede ser `null` (modo reglas). **Los consumidores lo tratan como anulable desde ahora.**
+- Sin detecciones: `detecciones: []` y `sin_detecciones: true`. **Es un resultado normal, no un error.**
+
+### MOD-06 → UT-02
+Códigos nuevos, con su mensaje y su público:
+
+| Situación | Para el usuario | Nivel |
+|---|---|---|
+| Fallo interno del motor (CA-05.4) | «No fue posible completar el análisis; intenta de nuevo» — **sin detalles técnicos**, y conservando el archivo cargado | Error |
+| Modelo no disponible (D-16.4) | Nada, o un aviso discreto: el análisis **sigue** en modo reglas | Registro interno |
+| Vector inválido en el endpoint (D-17) | Mensaje de error con motivo y acción | Error |
+| Sin detecciones confiables (CA-08) | «No se encontraron detecciones confiables» + sugerir revisar la calidad del espectro | **No es error**: viaja en el resultado |
+
+---
+
+## 6. Reglas de desempate y trampas conocidas
+
+El riesgo n.º 6 de Requerimientos §13 está **abierto**: el traslape O–H / N–H y C=C / aromático. Aquí se cierra con reglas concretas. Las tres primeras son las que deciden si el motor es químicamente honesto.
+
+**R-1 · O–H (GF-01) vs N–H (GF-02), traslapados en 3300–3500.** Desempate por **ancho de banda** (el rasgo que el propio catálogo usa): O–H es ancha e intensa; N–H más angosta, y en aminas primarias son dos picos. Se mide el ancho a media altura.
+
+> **Y la regla no es excluyente.** Son dos etiquetas, no una elección: CA-06.2 espera un espectro con **O–H y N–H detectados a la vez**. El desempate **ajusta los scores**, nunca suprime uno de los dos. Un desempate que elija ganador rompe CA-06.2.
+
+**R-2 · C=C (GF-06) vs anillo aromático (GF-07).** Sus regiones principales son vecinas (1620–1680 y 1450–1600) y ambos grupos son débiles. El desempate está en la **banda acompañante**, que es lo que de verdad los distingue:
+
+- GF-07 exige el **par** de bandas (~1600 **y** ~1500) **más** C–H aromático en 3000–3100.
+- GF-06 exige su **=C–H en 3020–3100**.
+- Si la banda acompañante no está, el score se **acota por debajo del umbral** en vez de reportar el grupo.
+
+**R-3 · La contaminación de CCl₄ de la acetona — la trampa ya documentada, convertida en prueba.** El archivo real de acetona declara `$$SPECTRAL CONTAMINATION DUE TO CCl4 AROUND 1550`. Esos 1550 cm⁻¹ caen dentro de 1450–1600, que es **GF-07**, y la acetona **no tiene anillo aromático**. Un «pico dentro del rango» ingenuo reporta un aromático inexistente.
+
+> Con R-2 no debería pasar: no hay par de bandas ni C–H aromático. Por eso se añade una prueba de regresión: **acetona → GF-05 detectado y GF-07 NO detectado.** CA-05.1 no lo exige (solo pide detectar C=O), así que es una prueba **añadida**; vale la pena porque convierte un hallazgo que ya costó encontrar en una red de seguridad permanente.
+
+**R-4 · El O–H de ácido pisa el C–H alifático.** GF-01 en ácidos cubre 2500–3300, y GF-03 vive en 2850–2960: **dentro** de esa banda. El ácido benzoico es el caso: su envolvente ancha de O–H ocupa la zona de C–H, pero el ácido benzoico **no tiene C–H alifático** (no hay carbonos sp³ en C₆H₅–COOH). Un detector ingenuo reportaría GF-03 en un compuesto que no lo tiene, y en el incremento 4 la capa educativa tendría que explicar un grupo falso.
+
+> Regla: dentro de una envolvente ancha de O–H, afirmar GF-03 exige **picos agudos y resueltos**, no un hombro ancho. Es exactamente el rasgo que el catálogo le asigna a GF-03 («picos agudos justo por debajo de 3000»). CA-05.2 lista O–H, C=O y aromático para el ácido benzoico; se añade la verificación de que **GF-03 no aparece**.
+
+**R-5 · El signo de `##DELTAX=` — cerrado, no reabrir.** El archivo real de ácido benzoico trae `+1` cuando el eje baja. Se resolvió en el incremento 2: MOD-04 deduce la dirección comparando `##FIRSTX=` con `##LASTX=`. Se anota aquí solo para que nadie lo vuelva a tocar desde MOD-06.
+
+**R-3 y R-4 quedaron confirmadas por el equipo el 23/11/2026** y entran como pruebas de regresión obligatorias de la sección 9, aunque ningún CA las exija.
+
+---
+
+## 7. Orden de trabajo, hitos y reparto
+
+### Secuencia
+
+```
+T-3R (datos) ──────────────────────────────────────────────┐  en paralelo a todo
+                                                            │
+T-14 (catálogo) ──┬──► T-15 (reglas) ──────────┐           │
+                  │                             ├──► T-17 ──┼──► T-18 ──► T-19
+                  └──► T-16a→b→c→d (vía ML) ────┘           │
+                                                            │
+        [T-20, plantillas del incremento 4, adelantable] ───┘
+```
+
+| Hito | Se cierra cuando | Evidencia |
+|---|---|---|
+| **H8** | UT-01 entrega los 7 grupos y la vía de reglas detecta C=O con su región en la acetona | Catálogo + prueba de cobertura + resultado de reglas sobre espectros reales y sintéticos |
+| **H9** | La vía ML tiene métricas sobre el conjunto de prueba independiente **y** la fusión con umbral funciona (CA-05.3) | Tablas de RNF-08 (las dos de D-13) + pruebas de umbral con confianzas simuladas |
+| **H10** | MOD-01 muestra la lista con su confianza y el aviso / el fallo; **el incremento 3 es demostrable** | CA-05.1, 05.2, 05.4, CA-08.1–08.3 + medición de RNF-02 |
+
+### Paralelización y cuellos de botella
+
+- **T-16 arranca el primer día, no después de T-15.** Es la tarea más pesada de toda la aplicación (esfuerzo **Alto** en el Plan V3) y está en la ruta crítica. Solo necesita de T-14 el orden canónico de las etiquetas, que es gratis.
+- **T-3R arranca antes que todo.** Sin los espectros de GF-04 y GF-06 (D-14) ni el dataset (D-12), T-15 se prueba a medias y T-16 no arranca. Es trabajo de datos y de química, no de código: **no se delega al agente de código.** Elegir el espectro correcto (fase, rango, puntos) es una decisión química; un agente que baje «el primer resultado» traerá un archivo que no sirve.
+- **T-15 va primero en valor.** Identifica de punta a punta por sí sola — es la Fase 1 del diseño y es el plan B ya construido. Si T-15 queda sólida, el plan B deja de ser un riesgo y pasa a ser una opción.
+- **T-20 se puede adelantar** desde el incremento 4: solo depende de T-14.
+
+### Reparto
+
+El Plan V3 asigna los responsables de los incrementos 2 a 5 **al arrancar cada uno**, y advierte expresamente la sobrecarga de este: *T-16 es la tarea más pesada y está en la ruta crítica; asignarla a una persona dedicada desde el inicio, mientras la otra avanza T-14, T-15, T-18 y T-19.*
+
+| Tarea | Responsable | Revisa | Esfuerzo (Plan V3) |
+|---|---|---|---|
+| T-3R | Por asignar | Por asignar | Medio |
+| T-14 | Por asignar | Por asignar | Medio |
+| T-15 | Por asignar | Por asignar | Medio-Alto |
+| T-16 (a–d) | Por asignar — **dedicada** | Por asignar | **Alto** |
+| T-17 | Por asignar | Por asignar | Medio |
+| T-18 | Por asignar | Por asignar | Bajo-Medio |
+| T-19 | Por asignar | Por asignar | Medio |
+
+---
+
+## 8. Tareas
+
+### T-3R · Datos y espectros del incremento 3 — `datos/referencia/`, `datos/dataset/`
+
+- **Objetivo:** cerrar los dos grupos sin espectro (GF-04, GF-06), armar el conjunto de entrenamiento y **congelar** el subconjunto de prueba independiente.
+- **Bloqueada por:** D-12 y D-14.
+- **Insumos:** NIST WebBook — las entradas exactas de D-14 (benzonitrilo `C100470`, ciclohexeno `C110838`, estireno `C100425`) y la lista de compuestos de D-12; los tres espectros ya descargados en T-0R; los términos de uso de NIST y SDBS.
+- **Partes:**
+  1. Los espectros de referencia nuevos, en **fase condensada** y con unidad admitida, cada uno con su nota de origen completa.
+  1-bis. **Cobertura verificada el 23/11/2026:** el tercer archivo de T-0R es `62-53-3` (**anilina**), así que **GF-02 queda cubierto** y los siete grupos tienen al menos un espectro. La tabla de cobertura y los huecos que quedan están en D-12.
+  2. El conjunto de entrenamiento según la opción elegida en D-12, con su `indice.csv` (identificador, CAS, fase, rango, puntos, origen, 7 etiquetas, split).
+  3. El split 70/15/15 **sin que un compuesto caiga en dos conjuntos**, y `split-prueba.txt` congelado con su suma de verificación.
+- **Terminado:** los espectros nuevos están en `datos/referencia/` con su nota; `indice.csv` y `split-prueba.txt` están versionados; los espectros del dataset **no** están en el repositorio; los términos de uso quedaron revisados y anotados.
+- **Fronteras:** no es trabajo del agente de código. El etiquetado se deriva de la estructura, no del espectro: si hay duda química sobre una etiqueta, el compuesto se deja fuera en vez de adivinar.
+
+### T-14 · Catálogo de los 7 grupos — UT-01 · `datos/catalogo/grupos.json`
+
+- **Objetivo:** fuente única de los 7 grupos, en solo lectura.
+- **Insumos:** la tabla de la sección 4 de este plan (Requerimientos §6.2 + MOD-06 §4).
+- **Predecesora:** ninguna.
+- **Terminado:** los 7 grupos con ID, nombre, región principal, regiones acompañantes, intensidad, forma y pista; el orden canónico fijado; subtipos de C=O cargados como informativos; leído solo a través de UT-01.
+- **Pruebas:** cobertura — los 7 grupos existen y ninguno le falta región ni rasgo. Prueba de no-«hardcodeo»: ningún número de región aparece fuera del catálogo.
+- **Fronteras:** **sin textos de explicación** (son T-20, incremento 4). El catálogo es datos, no lógica: no decide nada.
+
+### T-15 · Vía de reglas — `motor-identificacion/reglas`
+
+- **Objetivo:** detectar picos y compararlos con el catálogo; devolver un score en [0, 1] por grupo, **con su región y su pico**.
+- **Insumos:** vector normalizado de T-10, catálogo de T-14, reglas R-1 a R-4 de la sección 6.
+- **Predecesoras:** T-10, T-14.
+- **Terminado:** score por grupo; el score decrece con la distancia al rango y con la debilidad del pico (MOD-06 §6); las reglas de desempate aplicadas como **ajuste de score**, no como exclusión; con la acetona detecta C=O en 1670–1780 cm⁻¹.
+- **Pruebas:** espectros sintéticos (un pico en 1715 → GF-05 con su región; sin picos → nada); la acetona real → GF-05 sí, GF-07 no (R-3); el ácido benzoico real → O–H, C=O y aromático, y GF-03 no (R-4); el ciclohexeno → GF-06 (banda débil); el benzonitrilo → GF-04 y GF-07.
+- **Fronteras:** cero aprendizaje automático aquí; cero texto de explicación; no toca UT-03 más allá de leer lo que necesite. Debe ser **determinista**: la misma entrada da el mismo score siempre.
+
+### T-16 · Vía ML (CNN 1D multi-etiqueta) — `motor-identificacion/modelo` + `herramientas/entrenamiento/`
+
+La tarea más pesada del proyecto. Se parte en cuatro para que tenga hitos propios y no sea un bloque opaco de semanas (refinamiento autorizado por el Plan V3; no cambia su alcance ni su ID).
+
+**T-16a · Conjunto de datos y etiquetado.** Bloqueada por D-12 y T-3R. Terminado: el dataset existe, etiquetado en el orden canónico, con `indice.csv` y el split congelado, y el support de cada clase **contado y escrito** (es lo que explicará después los F1 bajos).
+
+**T-16b · Paridad de preprocesamiento.** Objetivo: el entrenamiento usa **la normalización real de MOD-04**, no una copia. Terminado: una prueba demuestra que un espectro procesado por la ruta de entrenamiento y por la ruta de producción da el **mismo vector**. Es la prueba que previene el riesgo «consistencia MOD-04 ↔ MOD-06» de MOD-06 §11. Bloqueada por el valor real de N (D-17).
+
+**T-16c · Entrenamiento.** Insumos: T-16a, T-16b, UT-01 (orden de etiquetas). Terminado: salida sigmoide de 7 probabilidades independientes (multi-etiqueta, no multi-clase); **semilla fija** y registrada; el desbalance de clases atendido explícitamente (ponderación por clase o, como mínimo, reportado con su support); el archivo de pesos en `motor-identificacion/modelo/` según D-18. Fronteras: la arquitectura concreta la decide quien implemente **dentro de este contrato**; lo que el plan fija es la entrada, la salida, la semilla, el split y las métricas. No se toca `split-prueba.txt`.
+
+**T-16d · Evaluación (RNF-08).** Terminado: las **dos** tablas de D-13 — la vía ML sola (sigmoide en 0.5) y el motor completo (post-fusión, umbral 60 %) — con precisión, recall, F1 y support de los siete grupos, macro-F1 y matriz de confusión uno-contra-resto, sobre el subconjunto de prueba independiente. Evidencia en `docs/evidencia/rnf-08.md`, con la semilla y la suma de verificación del split. Si un grupo de la puerta falla, se escribe y se escala a D-16. **El subconjunto de prueba se usa una sola vez.**
+
+### T-17 · Fusión y umbral — `motor-identificacion/inferencia`
+
+- **Objetivo:** `conf = wR·score_regla + wML·prob_ml` y aplicar el umbral.
+- **Insumos:** T-15, T-16, umbral y pesos de UT-03 (D-15).
+- **Predecesoras:** T-15, T-16 (o solo T-15 si se activó el plan B).
+- **Terminado:** confianza por grupo; umbral aplicado según la regla aritmética de D-15; resultados ordenados de mayor a menor; `sin_detecciones` cuando la lista queda vacía; la región y el pico tomados **de la vía de reglas**; `modo` y `evidencia.ml` según D-16; **funciona con `wML = 0` sin cambiar el contrato**.
+- **Pruebas:** CA-05.3 con confianzas simuladas (60 % aparece, 59 % no); CA-08.2 (máximo 59 % → aviso); `wML = 0` reproduce exactamente el score de reglas; cuando regla y ML coinciden la confianza sube y cuando discrepan baja (MOD-06 §8); el orden descendente se mantiene con empates.
+- **Fronteras:** no implementa la banda «posible» (D-15).
+
+### T-18 · Lista ordenada con su confianza — MOD-06 → MOD-01
+
+- **Objetivo:** que el usuario vea los grupos detectados con su confianza en porcentaje, de mayor a menor.
+- **Insumos:** T-17, el contrato HTTP de D-17.
+- **Terminado:** CA-05.1 (acetona → C=O con confianza ≥ 60 % en porcentaje) y CA-05.2 (ácido benzoico → O–H, C=O y aromático en orden descendente). El porcentaje mostrado **sale del mismo número que decidió el veredicto** (D-15).
+- **Fronteras:** sin explicaciones y sin resaltado — incremento 4. No se muestra el código de error interno al usuario.
+
+### T-19 · «Sin detecciones confiables» y fallo del motor
+
+- **Objetivo:** cubrir los dos caminos que no son el feliz, y no confundirlos.
+- **Insumos:** T-17, UT-02, MOD-01.
+- **Terminado:**
+  - CA-08.1 (espectro ruidoso, ningún grupo al 60 % → aviso, sugerencia de revisar la calidad, **ninguna** fila de grupo), CA-08.2 y CA-08.3 (solo línea base → aviso, sin detenerse de forma abrupta).
+  - CA-05.4 (fallo interno simulado → «No fue posible completar el análisis; intenta de nuevo», **sin detalles técnicos**, conservando el archivo cargado).
+  - Modelo ausente → arranca y responde **en modo reglas**, registrándolo, sin mensaje de error (D-16.4).
+- **Fronteras:** `sin_detecciones` **no** viaja por la ruta de errores de UT-02; va en el resultado. Confundir las dos cosas produce un «error» donde el sistema en realidad está siendo honesto.
+
+---
+
+## 9. Plan de pruebas
+
+Las filas del Plan V3 Paso 6 para el incremento 3, más las añadidas por este plan (marcadas **+**).
+
+| CA / RNF | Tipo | Datos o condición | Resultado esperado | Nivel | Evidencia |
+|---|---|---|---|---|---|
+| CA-05.1 | Normal | Espectro de referencia de acetona | Detecta C=O con confianza ≥ 60 % en porcentaje | Integr. (MOD-06) | Resultado + espectro |
+| CA-05.2 | Normal | Espectro de referencia de ácido benzoico | Lista O–H, C=O y aromático, de mayor a menor confianza | Integr. (MOD-06, MOD-01) | Captura de la lista |
+| CA-05.3 | Límite | Confianzas simuladas de 60 % y 59 % | El de 60 % aparece; el de 59 % no | Unit (MOD-06, UT-03) | Resultado + confianzas |
+| CA-05.4 | Error | Fallo interno simulado (mock) | Mensaje genérico, sin detalles técnicos, archivo conservado | Unit con mock | Captura + registro |
+| CA-08.1 | Normal | Espectro ruidoso, ningún grupo al 60 % | Aviso, sugerencia, lista vacía | Integr. | Captura del aviso |
+| CA-08.2 | Límite | Máxima confianza = 59 % | Aviso de sin detecciones confiables | Unit | Resultado + entrada |
+| CA-08.3 | Error | Espectro válido con solo línea base | Informa sin detenerse de forma abrupta | Integr. (MOD-06, MOD-04) | Captura + registro |
+| **RNF-08** | Métrica | Subconjunto de prueba **independiente y congelado** | Las dos tablas de D-13; puerta cumplida en GF-01, GF-04, GF-05; los siete reportados | Evaluación | `docs/evidencia/rnf-08.md` + semilla + suma del split |
+| **+ RNF-02** | Rendimiento | Análisis de un espectro, modelo ya cargado, CPU | ≤ 5 s desde «Analizar» (MOD-06 §9) | Integr. | Tiempos medidos, no estimados |
+| **+ R-3** | Regresión | Acetona real (con contaminación de CCl₄ en ~1550) | GF-05 detectado y **GF-07 no** | Unit (reglas) | Resultado + nota del archivo |
+| **+ R-4** | Regresión | Ácido benzoico real | O–H, C=O, aromático detectados y **GF-03 no** | Unit (reglas) | Resultado |
+| **+ R-1** | Límite | Espectro con O–H y N–H | **Ambos** detectados, ninguno suprimido (prepara CA-06.2) | Unit (reglas) | Resultado |
+| **+ GF-04** | Normal | Benzonitrilo | GF-04 detectado; GF-07 también | Integr. | Resultado + espectro |
+| **+ GF-06** | Límite | Ciclohexeno (banda débil) | GF-06 detectado | Integr. | Resultado + espectro |
+| **+ T-16b** | Paridad | Un mismo espectro por la ruta de entrenamiento y por la de producción | Vectores **idénticos** | Unit | Comparación |
+| **+ D-16.4** | Degradación | Archivo de pesos ausente | Arranca y responde en modo reglas; lo registra; sin error al usuario | Integr. | Registro + resultado con `modo: "reglas"` |
+| **+ D-17** | Error | Vector mal formado al endpoint (longitud, rango, eje) | Rechazo con código de UT-02; no llega al motor | Unit | Resultado |
+| **+ unidad** | Error (documental) | El `.jdx` real de estireno con `##YUNITS=dispersion index` | **Hoy pasa la validación y llega al motor.** La prueba deja constancia del comportamiento actual; el comportamiento deseado depende de la decisión abierta de `##YUNITS=` (sección 12) | Unit (MOD-03) | Resultado + archivo |
+| **+ UT-03** | Error | `wR + wML ≠ 1` en la configuración | Error de configuración claro; no arranca en silencio | Unit (UT-03) | Registro |
+
+**Disciplina de pruebas:** todas corren **sin red**. Las pruebas que tocan el modelo usan un archivo de pesos de prueba o se marcan como omitidas con su razón — nunca descargan ni entrenan dentro de la suite. Y se aplica la prueba de mutación: romper el umbral, el orden y una regla de desempate a propósito, y confirmar que una prueba revienta en cada caso.
+
+---
+
+## 10. Datos y persistencia de este incremento
+
+Alineado con la decisión de persistencia v2: **sin base de datos**, archivos de solo lectura a través de UT-01.
+
+| Qué | Dónde | Quién lo lee | ¿Al repositorio? |
+|---|---|---|---|
+| Catálogo de los 7 grupos | `datos/catalogo/grupos.json` | UT-01 → MOD-06 (y MOD-07, MOD-08) | **Sí** |
+| Modelo entrenado (pesos) | `motor-identificacion/modelo/` | UT-01, al arrancar | Según D-18: fuera durante la iteración, uno final para la entrega |
+| Índice del dataset y split de prueba | `datos/dataset/indice.csv`, `split-prueba.txt` | el script de entrenamiento | **Sí** (hace auditable RNF-08) |
+| Los espectros del dataset | fuera del repositorio | el script de entrenamiento | **No** (licencia y tamaño) |
+| Espectros de referencia de las pruebas | `datos/referencia/` | las pruebas | **Sí**, con su nota de origen y términos revisados |
+| Vector, confianzas y resultado de un análisis | memoria, durante la petición | MOD-06, MOD-01 | **No** — nada se persiste (RNF-09) |
+
+**Riesgos de datos propios de este incremento:** que el catálogo falte o se corrompa (se valida al cargar, como UT-03 en el incremento 1); que el modelo falte (D-16.4, degrada a reglas); que el split de prueba se contamine al reentrenar (lo previene congelarlo y versionar su suma de verificación).
+
+---
+
+## 11. Riesgos
+
+Los del Plan V3 Paso 8 para este incremento, más los que aparecen al detallarlo.
+
+| Riesgo | Impacto | Acción preventiva |
+|---|---|---|
+| Disponibilidad y **licencia** del conjunto de espectros (riesgo abierto n.º 4) | Alto | Revisar los términos de NIST y SDBS **antes** de bajar en volumen; no versionar los espectros, solo el índice y el split |
+| El motor no alcanza F1 ≥ 0.80 (RNF-08) | Alto | D-13 define la puerta con antelación; D-16 define el disparador del plan B; se documentan los grupos que queden bajo la meta con su support |
+| **Mezcla de fases** en el dataset (gas vs condensada) | Alto | D-12: una sola fase, condensada; la fase se anota por archivo; los de fase gas se excluyen o se evalúan aparte |
+| **Desbalance de clases** (C≡N raro, C=O en todo) | Alto | T-16a cuenta el support por clase antes de entrenar; T-16c lo atiende explícitamente; T-16d lo reporta junto al F1 |
+| Traslape O–H/N–H y C=C/aromático (riesgo abierto n.º 6) | Medio | Reglas R-1 y R-2, con la banda acompañante como desempate; pruebas de regresión R-3 y R-4 |
+| **Deriva entre el preprocesamiento de entrenamiento y el de producción** (MOD-06 §11) | Alto | T-16b: el entrenamiento importa la normalización real de MOD-04, y una prueba lo demuestra |
+| **Cruce del orden de etiquetas** entre T-14 y T-16 | Alto | El orden canónico queda fijado en la sección 4 de este plan, una sola vez |
+| Pesos de la fusión mal calibrados (una vía domina a la otra) | Medio | Arrancar en 0.5/0.5; recalibrar **solo** con el split de validación (D-15) |
+| **RNF-02** se rompe al entrar el modelo | Medio | El modelo se carga una vez al arrancar (MOD-06 §9); se mide el tiempo en H10, no se estima |
+| **Sobrecarga en T-16**, que está en la ruta crítica | Alto | Una persona dedicada a T-16 desde el día uno; la otra avanza T-14, T-15, T-18, T-19 |
+| El binario del modelo infla el repositorio | Bajo | D-18: fuera durante la iteración; uno final para la entrega, o Git LFS |
+| T-3R se delega al agente de código y trae archivos inservibles | Medio | Es trabajo humano: elegir fase, rango y puntos es una decisión química |
+
+---
+
+## 12. Decisiones abiertas y herencia
+
+**Que este incremento hereda sin resolver (vienen de antes):**
+
+- `SUPUESTO` — **validar `##YUNITS=`**: en cuatro descargas reales del incremento 1 aparecieron tres unidades distintas (transmitancia, reflectancia, índice de refracción), y §6.1 solo admite transmitancia y absorbancia, pero ningún CA lo cubre. Es un **cambio de alcance** que requiere aprobación. Si se cerró en el incremento 2, anotarlo aquí y tacharlo.
+  - **Ya dejó de ser hipotético (23/11/2026).** El `.jdx` de estireno descargado trae `##YUNITS=dispersion index` y **pasaría la validación actual**: llegaría a MOD-04 y el motor produciría gráfica y detecciones a partir de números que no son intensidades. Es un resultado silenciosamente incorrecto, que es la peor clase de error. El archivo queda en `datos/referencia/` como caso de error real y como argumento para cerrar la decisión: añadir la lista de unidades admitidas a UT-03, la verificación a MOD-03 y su mensaje a UT-02. **Sigue requiriendo aprobación del equipo: no se implementa por cuenta propia dentro del incremento 3.**
+- Pendiente documental: las menciones de `.dx` que quedan en el PDF de Requerimientos (RF-01 sobre todo). No afecta código; deja limpia la trazabilidad de la entrega.
+
+**Que este incremento genera y hay que escribir fuera de él:**
+
+- **La actualización de RNF-08** en Requerimientos §8 y §11.2, con fila nueva en Control de versiones (V3.3), y la redacción literal en MOD-06 §8 (v2.1) — ver la tabla de D-13.
+- **La limitación de fase condensada** (de D-12), en **dos** sitios de Requerimientos V3.3:
+  - **§6.1, «Parámetros de entrada y de análisis»** — es su sitio natural, porque esa tabla ya contiene «Unidades de intensidad». Fila nueva: *Fase de la muestra · Condensada (líquido o sólido) · Los espectros de referencia y el ajuste del motor usan fase condensada; en fase gas la banda ancha de O–H desaparece y las posiciones de banda se corren.*
+  - **§5, «Fuera del alcance»** — fila nueva: *Espectros de fase gas · Quedan fuera del régimen para el que se ajustó el motor; se declara como limitación conocida.*
+  - **Y una advertencia para quien implemente:** esto **no es una validación**. MOD-03 no puede deducir la fase del archivo, así que no hay CA ni regla que lo verifique. Es una limitación **declarada**, no comprobada. Que nadie intente hacer que MOD-03 la valide.
+
+**Para el manual de usuario (RNF-07), cuando se escriba.** Todavía no existe; queda aquí la lista de lo que tendrá que decir, para no reconstruirla después:
+
+- La herramienta trabaja con espectros de **fase condensada**; con fase gas el resultado no es confiable, sobre todo en O–H.
+- Reconoce **siete grupos funcionales** y **no identifica la molécula completa** ni cuantifica.
+- Qué significa el **nivel de confianza** y por qué solo se listan los que alcanzan el **60 %**.
+- Qué pasa cuando **no hay detecciones confiables**: es un resultado honesto, no un fallo.
+- Formatos admitidos (.jdx, .csv), tamaño máximo (5 MB), mínimo de puntos (300) y rango requerido (1400–3700 cm⁻¹).
+- El resultado es **orientativo** (ya exigido por RF-08 para el reporte).
+- Si el motor corrió en **modo reglas** (plan B de D-16), decirlo.
+- Los grupos que hayan quedado por debajo de la meta de F1, con su cifra: lo que RNF-08 obliga a documentar y no ocultar.
+
+**Que este incremento deja al incremento 4:**
+
+- **T-20 (plantillas de explicación) es adelantable**: solo depende de T-14.
+- MOD-07 y MOD-08 deben tratar **`evidencia.ml` como anulable** y leer `modo` (D-16.3). Cuesta cero hoy.
+- Si el motor entregó en **modo reglas**, el reporte del incremento 5 debería decirlo, junto al aviso de resultado orientativo que ya exige RF-08.
+- `pico_cm1` puede venir `null`: es el caso CA-06.3, y MOD-05 debe resaltar la región completa.
+- Los **subtipos de C=O** del catálogo quedan listos para las explicaciones, sin haber sido detecciones separadas.
+- Los grupos que hayan quedado por debajo de la meta de F1 se documentan con su support: la capa educativa debería ser más prudente al explicarlos.
+
+---
+
+## 13. Fuentes externas usadas en este plan
+
+- NIST Chemistry WebBook (`webbook.nist.gov`) — identificadores de especie verificados: benzonitrilo `C100470` (100-47-0), ciclohexeno `C110838` (110-83-8), estireno `C100425` (100-42-5), tolueno `C108883` (108-88-3), **ciclohexano `C110827` (110-82-7 — compuesto distinto del ciclohexeno)**, fenol `C108952` (108-95-2), acetonitrilo `C75058` (75-05-8), 1-hexeno `C592416` (592-41-6), acetato de etilo `C141786` (141-78-6), ciclohexanol `C108930`, acetato de butilo `C123864`. La fase del espectro **no** aparece en la página de especie: hay que verla al abrir el espectro, donde además se elige entre varias entradas (líquido neto, disolución, gas). Las páginas llevan la nota de *data compilation copyright* del U.S. Secretary of Commerce.
+- Los rangos de los 7 grupos provienen de Requerimientos V3.2 §6.2 y de MOD-06 §4, que a su vez citan la tabla de absorciones IR de la University of Colorado Boulder y LibreTexts.
+
+---
+
+## 14. Registro de lo implementado
+
+*(Esta sección se llena al cerrar el incremento, siguiendo la convención de `incremento-2.md` §11: cómo quedaron en el código las decisiones de arriba, qué se resolvió por el camino y qué quedó marcado `SUPUESTO` para que el equipo lo confirme.)*
+
+- **D-12 / T-3R — conjunto de datos:**
+- **D-13 / T-16d — métricas de RNF-08:**
+- **D-14 / T-3R — espectros de referencia añadidos:**
+- **D-15 / T-17 — umbral y pesos:**
+- **D-16 — ¿se activó el plan B?:**
+- **D-17 / T-18 — contrato de `/api/analizar`:**
+- **D-18 — dónde quedó el modelo:**
+- **D-19 — N y la comprobación de arranque:**
+- **Reglas de desempate R-1 a R-4 — cómo quedaron:**
+- **Evidencia:**
+- **Pendientes:**
