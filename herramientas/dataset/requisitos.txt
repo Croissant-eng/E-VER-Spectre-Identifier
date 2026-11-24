@@ -1,0 +1,3 @@
+# Solo para herramientas/dataset (T-16a). NO es dependencia de la aplicacion:
+# se instala en un entorno aparte, nunca en el .venv del backend.
+rdkit==2026.9.2
