@@ -384,6 +384,29 @@ h1 {
   color: var(--rechazado);
 }
 
+/* Incremento 5: el bloque del reporte. */
+.bloque-reporte {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: var(--espacio);
+  padding-top: var(--espacio);
+  border-top: 1px solid var(--borde);
+}
+
+.bloque-reporte p {
+  margin: 0;
+}
+
+.reporte-titulo {
+  font-weight: 600;
+  color: var(--rechazado);
+}
+
+.reporte-accion {
+  font-weight: 600;
+}
+
 .pie {
   color: var(--texto-suave);
   font-size: 0.85rem;
