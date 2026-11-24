@@ -301,10 +301,73 @@ h1 {
 
 .analisis-fila {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--borde);
+}
+
+.analisis-cabecera {
+  display: flex;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.6rem 0;
-  border-top: 1px solid var(--borde);
+}
+
+/* Incremento 4: resaltar en la gráfica y la explicación de cada grupo. */
+.boton-resaltar {
+  width: auto;
+  min-height: 2.25rem;
+  align-self: flex-start;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--acento);
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--acento);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.boton-resaltar[aria-pressed="true"] {
+  background: var(--acento);
+  color: var(--acento-texto);
+}
+
+.analisis-explicacion summary {
+  cursor: pointer;
+  color: var(--acento);
+}
+
+.analisis-explicacion p {
+  margin: 0.4rem 0 0;
+  line-height: 1.45;
+}
+
+.explicacion-aviso {
+  font-weight: 600;
+}
+
+.grafica-leyenda {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: var(--espacio) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.grafica-leyenda li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.leyenda-muestra {
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 0.2rem;
 }
 
 .analisis-confianza {

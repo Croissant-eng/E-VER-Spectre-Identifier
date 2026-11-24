@@ -94,6 +94,45 @@ function mensajeCompleto(datos) {
   return completo.titulo && completo.mensaje && completo.accion ? completo : null;
 }
 
+/** El texto de respaldo si el servidor no mandó el aviso completo. */
+export const EXPLICACION_NO_DISPONIBLE = "Explicación no disponible";
+
+/**
+ * La explicación de MOD-07 lista para pintar (incremento 4), o null si la
+ * respuesta no trae ninguna.
+ *
+ * Disponible: sus partes en el orden de CA-07.1 (región, posición, rasgo y
+ * porqué) más la distinción si la hay (CA-07.2). No disponible: el aviso de
+ * UT-02 (CA-07.3), y el grupo se sigue mostrando.
+ */
+function explicacionDe(explicacion) {
+  if (!esObjeto(explicacion)) {
+    return null;
+  }
+  if (explicacion.disponible === true) {
+    const partes = ["region", "posicion", "rasgo", "por_que", "distincion"]
+      .map((clave) => texto(explicacion[clave]))
+      .filter((parte) => parte !== "");
+    if (partes.length > 0) {
+      return { disponible: true, partes };
+    }
+  }
+  return {
+    disponible: false,
+    titulo: texto(explicacion.titulo) || EXPLICACION_NO_DISPONIBLE,
+    mensaje: texto(explicacion.mensaje),
+    accion: texto(explicacion.accion),
+  };
+}
+
+function esRegion(valor) {
+  return (
+    Array.isArray(valor) &&
+    valor.length === 2 &&
+    valor.every((x) => typeof x === "number" && Number.isFinite(x))
+  );
+}
+
 /** Una fila de la lista, o null si la detección viene incompleta. */
 function filaDe(deteccion) {
   if (!esObjeto(deteccion)) {
@@ -105,7 +144,17 @@ function filaDe(deteccion) {
   if (!grupo || !nombre || !Number.isInteger(porcentaje)) {
     return null;
   }
-  return { grupo, nombre, porcentaje, confianza: `${porcentaje} %` };
+  const pico = deteccion.pico_cm1;
+  return {
+    grupo,
+    nombre,
+    porcentaje,
+    confianza: `${porcentaje} %`,
+    // Lo que necesita el resaltado (T-23 y T-24). Sin región no se resalta.
+    region_cm1: esRegion(deteccion.region_cm1) ? deteccion.region_cm1 : null,
+    pico_cm1: typeof pico === "number" && Number.isFinite(pico) ? pico : null,
+    explicacion: explicacionDe(deteccion.explicacion),
+  };
 }
 
 /**

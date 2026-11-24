@@ -10,6 +10,7 @@
  */
 
 import { configuracionDeGrafica } from "./configuracion.js";
+import { anotacionesDe, leyendaDe } from "./resaltado.js";
 
 function libreria() {
   const Chart = globalThis.Chart;
@@ -58,6 +59,7 @@ export const IDS_GRAFICA = {
   titulo: "grafica-titulo",
   mensaje: "grafica-mensaje",
   accion: "grafica-accion",
+  leyenda: "grafica-leyenda",
 };
 
 /** Busca una vez los elementos de la gráfica. */
@@ -105,4 +107,41 @@ export function pintarGrafica(vista, elementos) {
     limpiar(lienzo);
   }
   return lista;
+}
+
+/**
+ * Resalta sobre la gráfica los grupos elegidos y pinta su leyenda (T-23 y
+ * T-24). Con una lista vacía quita todo el resaltado.
+ *
+ * @param {object} elementos lo que devolvió elementosDeGrafica.
+ * @param {Array<object>} elegidos las filas del análisis que se eligieron.
+ */
+export function resaltar(elementos, elegidos) {
+  const grafica = graficaDe(elementos.lienzo);
+  if (grafica) {
+    grafica.options.plugins.annotation.annotations = anotacionesDe(elegidos);
+    grafica.update("none");
+  }
+
+  const { leyenda } = elementos;
+  if (!leyenda) {
+    return;
+  }
+  leyenda.replaceChildren();
+  for (const entrada of leyendaDe(elegidos)) {
+    const documento = leyenda.ownerDocument;
+    const elemento = documento.createElement("li");
+    elemento.dataset.grupo = entrada.grupo;
+
+    const muestra = documento.createElement("span");
+    muestra.className = "leyenda-muestra";
+    muestra.style.backgroundColor = entrada.color;
+
+    const texto = documento.createElement("span");
+    texto.textContent = `${entrada.nombre}: ${entrada.detalle}`;
+
+    elemento.append(muestra, texto);
+    leyenda.append(elemento);
+  }
+  leyenda.hidden = leyenda.children.length === 0;
 }
