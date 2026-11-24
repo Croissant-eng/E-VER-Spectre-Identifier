@@ -13,7 +13,14 @@
  * es lo que lo mantiene sin acción de verdad (RF-04 es del incremento 3).
  */
 
+import { procesarEspectro } from "../servicios/procesamiento.js";
 import { validarEspectro } from "../servicios/validacion.js";
+import {
+  vistaDeGrafica,
+  vistaGraficaEsperando,
+  vistaGraficaOculta,
+} from "../visor-espectro/configuracion.js";
+import { elementosDeGrafica, pintarGrafica } from "../visor-espectro/visor.js";
 import { elementosDe, pintar } from "./pintar.js";
 import { vistaDesdeRespuesta, vistaEsperando, vistaInicial } from "./vista.js";
 
@@ -26,9 +33,11 @@ import { vistaDesdeRespuesta, vistaEsperando, vistaInicial } from "./vista.js";
  */
 export function conectar(documento, opciones = {}) {
   const elementos = elementosDe(documento);
+  const grafica = elementosDeGrafica(documento);
   const { formulario, archivo, validar } = elementos;
 
   pintar(vistaInicial(), elementos);
+  pintarGrafica(vistaGraficaOculta(), grafica);
 
   if (!formulario || !archivo || !validar) {
     return elementos;
@@ -52,9 +61,19 @@ export function conectar(documento, opciones = {}) {
 
     validar.disabled = true;
     pintar(vistaEsperando(elegido.name), elementos);
+    // Una gráfica de un archivo anterior no se queda en pantalla.
+    pintarGrafica(vistaGraficaOculta(), grafica);
 
     const respuesta = await validarEspectro(elegido, opciones);
-    pintar(vistaDesdeRespuesta(respuesta), elementos);
+    const aprobado = pintar(vistaDesdeRespuesta(respuesta), elementos);
+
+    // Incremento 2: solo un archivo aprobado pasa a MOD-04 y se dibuja. Uno
+    // rechazado se queda con su mensaje y sin gráfica (CA-04.3).
+    if (aprobado) {
+      pintarGrafica(vistaGraficaEsperando(), grafica);
+      const procesado = await procesarEspectro(elegido, opciones);
+      pintarGrafica(vistaDeGrafica(procesado), grafica);
+    }
 
     validar.disabled = false;
   });

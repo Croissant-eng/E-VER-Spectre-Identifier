@@ -47,9 +47,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.api.veredicto import aceptado, rechazado
+from backend.api.veredicto import aceptado, procesado, rechazado
 from backend.manejador_archivos import recibir
 from backend.nucleo import obtener_registro
+from backend.preprocesamiento import procesar
 from backend.utilerias import mensajes
 from backend.utilerias.configuracion import Configuracion, ErrorDeConfiguracion
 from backend.utilerias.configuracion import obtener as obtener_configuracion
@@ -61,6 +62,14 @@ _registro = obtener_registro("api")
 #: repite estos dos valores porque no puede importar Python; una prueba falla si
 #: se separan.
 RUTA_VALIDAR: str = "/api/validar"
+
+#: Incremento 2. Recibe el mismo archivo, lo pasa otra vez por MOD-02 y MOD-03
+#: y después por MOD-04, y devuelve el espectro normalizado para la gráfica.
+#: Es una ruta aparte para no cambiar el contrato D-5 de /api/validar, que el
+#: incremento 1 dejó cerrado en {valido, nombre, bytes}. Como el archivo no se
+#: guarda en ningún lado (RNF-09), la página lo vuelve a mandar.
+#: `frontend/servicios/procesamiento.js` repite esta ruta.
+RUTA_PROCESAR: str = "/api/procesar"
 CAMPO_ARCHIVO: str = "archivo"
 
 #: Dónde se sirve cada carpeta del frontend. Se conservan los nombres del
@@ -69,6 +78,11 @@ CAMPO_ARCHIVO: str = "archivo"
 #: `../servicios/validacion.js` y da justo en `/servicios/validacion.js`.
 RUTA_INTERFAZ: str = "/interfaz"
 RUTA_SERVICIOS: str = "/servicios"
+#: Incremento 2: la gráfica (MOD-05) y las librerías guardadas en el repositorio
+#: (D-1). Se montan aparte, igual que las otras, para no publicar
+#: `frontend/pruebas/`.
+RUTA_VISOR: str = "/visor-espectro"
+RUTA_LIBRERIAS: str = "/vendor"
 
 #: La raíz del frontend. `frontend/pruebas/` (D-9) **no** se monta: es del
 #: equipo, no de la web.
@@ -213,6 +227,48 @@ def crear_aplicacion(
             # la intención por escrito y de paso cubre el caso del error.
             del recepcion
 
+    @aplicacion.post(RUTA_PROCESAR)
+    async def procesar_espectro(archivo: UploadFile = File(...)) -> JSONResponse:
+        """MOD-02, MOD-03 y MOD-04 en la misma petición (incremento 2).
+
+        Un rechazo de cualquiera de los tres es un resultado del negocio: 200
+        con el mensaje de UT-02. MOD-04 suma sus propios rechazos, por ejemplo
+        la línea plana (CA-03.3) o la unidad que no se reconoce (D-10, D-11).
+        """
+        recepcion = None
+        try:
+            recepcion = await recibir(archivo, parametros)
+            if not recepcion.aceptado:
+                return JSONResponse(rechazado(recepcion.codigo, parametros))
+
+            resultado = validar(
+                recepcion.nombre,
+                recepcion.contenido,
+                tamano_correcto=recepcion.tamano_correcto,
+                configuracion=parametros,
+            )
+            if not resultado.valido:
+                return JSONResponse(rechazado(resultado.codigo, parametros))
+
+            # MOD-04: solo ve el nombre y el texto ya aprobado.
+            salida = procesar(recepcion.nombre, recepcion.contenido, parametros)
+            if not salida.valido:
+                return JSONResponse(rechazado(salida.codigo, parametros))
+
+            return JSONResponse(procesado(recepcion.nombre, salida.espectro))
+        except Exception:
+            _registro.exception(
+                "api fallo interno | ruta=%s | resultado=%s",
+                RUTA_PROCESAR,
+                mensajes.FALLO_INTERNO,
+            )
+            return JSONResponse(
+                status_code=CODIGO_FALLO_INTERNO,
+                content=rechazado(mensajes.FALLO_INTERNO, parametros),
+            )
+        finally:
+            del recepcion
+
     @aplicacion.get("/")
     async def inicio() -> RedirectResponse:
         """La raíz lleva a la interfaz, que es lo único que hay que abrir."""
@@ -237,6 +293,18 @@ def _montar_frontend(aplicacion: FastAPI, carpeta: Path) -> None:
         RUTA_SERVICIOS,
         StaticFiles(directory=carpeta / "servicios"),
         name="servicios",
+    )
+    aplicacion.mount(
+        RUTA_VISOR,
+        # check_dir=False: una copia del frontend sin estas carpetas (como la
+        # de una prueba) sigue arrancando; solo no tendría gráfica.
+        StaticFiles(directory=carpeta / "visor-espectro", check_dir=False),
+        name="visor-espectro",
+    )
+    aplicacion.mount(
+        RUTA_LIBRERIAS,
+        StaticFiles(directory=carpeta / "vendor", check_dir=False),
+        name="vendor",
     )
 
 

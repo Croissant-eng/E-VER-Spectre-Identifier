@@ -38,6 +38,7 @@ FRONTEND = RAIZ / "frontend"
 INTERFAZ = FRONTEND / "interfaz"
 SERVICIOS = FRONTEND / "servicios"
 PRUEBAS_JS = FRONTEND / "pruebas"
+LIBRERIAS_GUARDADAS = FRONTEND / "vendor"
 
 PAGINA = INTERFAZ / "index.html"
 ESTILOS = INTERFAZ / "estilos.css"
@@ -157,6 +158,11 @@ def prueba_la_pagina_no_descarga_nada_de_internet() -> None:
     sospechosos: list[str] = []
     for archivo in sorted(FRONTEND.rglob("*")):
         if not archivo.is_file() or archivo.suffix not in {".html", ".css", ".js"}:
+            continue
+        # Las librerías guardadas de D-1 traen la dirección de su proyecto en
+        # el comentario de licencia; no descargan nada. Que la página las
+        # cargue del repositorio lo revisa prueba_t12_t13_grafica.py.
+        if LIBRERIAS_GUARDADAS in archivo.parents:
             continue
         texto = archivo.read_text(encoding="utf-8")
         for patron in ("http://", "https://", "//cdn.", "cdnjs", "unpkg", "jsdelivr"):
